@@ -834,20 +834,19 @@ async def create_device(
             supabase.table("device_specs").insert(specs_payload).execute()
             
     # Log de creación
-    "device_id": device_id,
-        "device_id": response.data[0]["id"],
+    supabase.table("device_logs").insert({
+        "device_id": device_id,
         "tipo": "OTRO",
         "descripcion": f"Dispositivo creado por {user.nombre}",
-        "realizado_por": user.id
+        "realizado_por": user.id,
     }).execute()
 
     # Registrar en auditoría
     await register_audit_event(
         "CREATE_DEVICE",
         device_id,
-        response.data[0]["id"],
         user.id,
-        {"device_name": device.nombre, "type": device.tipo}
+        {"device_name": device.nombre, "type": device.tipo},
     )
 
     return {"data": response.data[0], "message": "Dispositivo creado exitosamente"}
