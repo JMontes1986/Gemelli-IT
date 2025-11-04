@@ -798,7 +798,7 @@ async def create_device(
     device_data = {k: v for k, v in device_data.items() if v is not None}
     device_data["org_unit_id"] = user.org_unit_id
     device_data["creado_por"] = user.id
-    device_data["fecha_ingreso"] = datetime.utcnow().isoformat()
+    device_data["fecha_ingreso"] = datetime.utcnow().date().isoformat()
     
     response = supabase.table("devices").insert(device_data).execute()
     device_id = response.data[0]["id"]
