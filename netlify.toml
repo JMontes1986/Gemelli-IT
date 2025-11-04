@@ -74,9 +74,12 @@ PUBLIC_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXB
   # The base directory is set to "apps/web", so the functions path must be
   # resolved relative to that directory. Netlify expects the directory to
   # point to the Python functions that proxy the FastAPI backend.
+  # Directorio que contiene la función Python que expone el backend de FastAPI
+  # para Netlify Functions.
   directory = "../api/netlify-functions"
+  included_files = ["apps/api/app/**"]
   node_bundler = "esbuild"
-
+  
 # Variables de entorno de contexto
 [context.production.environment]
   NODE_ENV = "production"
