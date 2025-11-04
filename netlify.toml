@@ -2,15 +2,13 @@
 # Configuración de despliegue para Gemelli IT
 
 [build]
-  base = "apps/web"
-  publish = "dist"
-  command = "npm run build"
-
+  included_files = ["apps/api/app/**"]
 [build.environment]
   NODE_VERSION = "18"
   PNPM_VERSION = "8"
 PUBLIC_SUPABASE_URL = "https://zywsqwpqlcheddpmvmsl.supabase.co"
 PUBLIC_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5d3Nxd3BxbGNoZWRkcG12bXNsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA1NzkwODUsImV4cCI6MjA3NjE1NTA4NX0.nQAuEJUEi9px5a8V61lJWzRthMwD8dfMzHUBLla9ktE"
+
 # Redireccionamientos
 [[redirects]]
   from = "/api/*"
