@@ -84,7 +84,12 @@ class LazySupabaseClient:
 supabase = LazySupabaseClient()
 
 
-def handle_supabase_error(response, default_message: str) -> None:
+def handle_supabase_error(
+    response,
+    default_message: str,
+    *,
+    require_data: bool = False,
+):
     """Valida la respuesta de Supabase y arroja HTTPException con mensajes claros."""
 
     error = getattr(response, "error", None)
@@ -93,11 +98,17 @@ def handle_supabase_error(response, default_message: str) -> None:
         message = getattr(error, "message", None) or (
             error.get("message") if isinstance(error, dict) else str(error)
         )
-        raise HTTPException(status_code=400, detail=message or default_message)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=message or default_message)
+
+    status_code = getattr(response, "status_code", None)
+    if status_code and status_code >= 400:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=default_message)
 
     data = getattr(response, "data", None)
-    if data in (None, []):
-        raise HTTPException(status_code=502, detail=default_message)
+    if require_data and (data is None or (isinstance(data, list) and len(data) == 0)):
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=default_message)
+
+    return data
         
 app = FastAPI(
     title="Gemelli IT API",
@@ -816,10 +827,21 @@ async def create_device(
     device_data["creado_por"] = user.id
     device_data["fecha_ingreso"] = datetime.utcnow().date().isoformat()
     
-    response = supabase.table("devices").insert(device_data).execute()
-    handle_supabase_error(response, "No se pudo crear el dispositivo en Supabase")
+    response = (
+        supabase.table("devices")
+        .insert(device_data)
+        .select("*")
+        .execute()
+    )
+    device_data_response = handle_supabase_error(
+        response, "No se pudo crear el dispositivo en Supabase", require_data=True
+    )
 
-    device_record = response.data[0]
+    if isinstance(device_data_response, list):
+        device_record = device_data_response[0]
+    else:
+        device_record = device_data_response
+
     device_id = device_record["id"]
 
     if specs_data:
