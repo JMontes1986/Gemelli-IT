@@ -83,6 +83,22 @@ class LazySupabaseClient:
 
 supabase = LazySupabaseClient()
 
+
+def handle_supabase_error(response, default_message: str) -> None:
+    """Valida la respuesta de Supabase y arroja HTTPException con mensajes claros."""
+
+    error = getattr(response, "error", None)
+    if error:
+        # El objeto error puede ser un dict del cliente de Supabase o un string.
+        message = getattr(error, "message", None) or (
+            error.get("message") if isinstance(error, dict) else str(error)
+        )
+        raise HTTPException(status_code=400, detail=message or default_message)
+
+    data = getattr(response, "data", None)
+    if data in (None, []):
+        raise HTTPException(status_code=502, detail=default_message)
+        
 app = FastAPI(
     title="Gemelli IT API",
     description="API para gestión de inventario y HelpDesk",
@@ -208,7 +224,7 @@ class InventoryPermissionResponse(BaseModel):
     granted_by: Optional[str]
 
     
-    class AdminUserBase(BaseModel):
+class AdminUserBase(BaseModel):
     nombre: str = Field(..., min_length=2, max_length=150)
     email: str = Field(..., max_length=255)
     rol: Literal["DOCENTE", "ADMINISTRATIVO", "TI", "DIRECTOR", "LIDER_TI"]
@@ -801,7 +817,10 @@ async def create_device(
     device_data["fecha_ingreso"] = datetime.utcnow().date().isoformat()
     
     response = supabase.table("devices").insert(device_data).execute()
-    device_id = response.data[0]["id"]
+    handle_supabase_error(response, "No se pudo crear el dispositivo en Supabase")
+
+    device_record = response.data[0]
+    device_id = device_record["id"]
 
     if specs_data:
         specs_payload = {
@@ -831,15 +850,17 @@ async def create_device(
         }
 
         if len(specs_payload.keys()) > 1:
-            supabase.table("device_specs").insert(specs_payload).execute()
+            specs_response = supabase.table("device_specs").insert(specs_payload).execute()
+            handle_supabase_error(specs_response, "No se pudieron guardar las especificaciones del dispositivo")
             
     # Log de creación
-    supabase.table("device_logs").insert({
+    log_response = supabase.table("device_logs").insert({
         "device_id": device_id,
         "tipo": "OTRO",
         "descripcion": f"Dispositivo creado por {user.nombre}",
         "realizado_por": user.id,
     }).execute()
+    handle_supabase_error(log_response, "No se pudo registrar el log del dispositivo")
 
     # Registrar en auditoría
     await register_audit_event(
@@ -849,7 +870,7 @@ async def create_device(
         {"device_name": device.nombre, "type": device.tipo},
     )
 
-    return {"data": response.data[0], "message": "Dispositivo creado exitosamente"}
+    return {"data": device_record, "message": "Dispositivo creado exitosamente"}
 
 @app.get("/inventory/devices/{device_id}/cv")
 async def get_device_cv(
