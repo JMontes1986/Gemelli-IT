@@ -5,6 +5,7 @@
   base = "apps/web"
   publish = "dist"
   command = "npm run build"
+  ignore = "bash ../scripts/netlify-ignore.sh"
 
 [build.environment]
   NODE_VERSION = "18"
