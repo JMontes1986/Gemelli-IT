@@ -2,18 +2,15 @@
 # Configuración de despliegue para Gemelli IT
 
 [build]
- # Ejecuta la build del frontend de Astro sin cambiar el directorio base del repositorio.
-  # De esta forma Netlify detecta cambios tanto en el frontend como en el backend
-  # (por ejemplo, en apps/api/app/main.py) y no cancela los despliegues por ignorar
-  # archivos fuera de la carpeta base.
-  publish = "apps/web/dist"
-  command = "npm --prefix apps/web install && npm --prefix apps/web run build"
+  base = "apps/web"
+  publish = "dist"
+  command = "npm run build"
 
-  [build.environment]
+[build.environment]
   NODE_VERSION = "18"
   PNPM_VERSION = "8"
-  PUBLIC_SUPABASE_URL = "https://zywsqwpqlcheddpmvmsl.supabase.co"
-  PUBLIC_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5d3Nxd3BxbGNoZWRkcG12bXNsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA1NzkwODUsImV4cCI6MjA3NjE1NTA4NX0.nQAuEJUEi9px5a8V61lJWzRthMwD8dfMzHUBLla9ktE"
+PUBLIC_SUPABASE_URL = "https://zywsqwpqlcheddpmvmsl.supabase.co"
+PUBLIC_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5d3Nxd3BxbGNoZWRkcG12bXNsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA1NzkwODUsImV4cCI6MjA3NjE1NTA4NX0.nQAuEJUEi9px5a8V61lJWzRthMwD8dfMzHUBLla9ktE"
 # Redireccionamientos
 [[redirects]]
   from = "/api/*"
@@ -60,16 +57,22 @@
 [[headers]]
   for = "/*"
   [headers.values]
-    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https: blob:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.openai.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self';"
+    Content-Security-Policy = '''
+      default-src 'self';
+      script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com;
+      style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+      font-src 'self' https://fonts.gstatic.com;
+      img-src 'self' data: https: blob:;
+      connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.openai.com;
+      frame-ancestors 'none';
+      base-uri 'self';
+      form-action 'self';
+    '''
 
 # Funciones serverless
 [functions]
-  # Directorio que contiene la función Python que expone el backend de FastAPI
-  # para Netlify Functions.
-  directory = "apps/api/netlify-functions"
-  included_files = ["apps/api/app/**"]
-  node_bundler = "esbuild"
-  
+  # The base directory is set to "apps/web", so the functions path must be
+  # resolved relative to that directory. Netlify expects the directory to
   # point to the Python functions that proxy the FastAPI backend.
   # Directorio que contiene la función Python que expone el backend de FastAPI
   # para Netlify Functions.
