@@ -255,6 +255,8 @@ pnpm test
 pnpm test:e2e
 ```
 
+📌 **Pruebas específicas de inventario**: sigue el checklist de `docs/PRUEBAS_INVENTARIO.md` para validar que el backend (o la función serverless de Netlify) responde correctamente antes de depurar el frontend.
+
 ## 🌱 Datos de Ejemplo
 
 El archivo `infra/seed.sql` incluye:
