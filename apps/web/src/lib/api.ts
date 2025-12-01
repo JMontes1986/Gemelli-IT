@@ -34,17 +34,24 @@ async function fetchAPI(endpoint: string, options: RequestInit = {}) {
     headers,
   });
 
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: 'Error desconocido' }));
-    throw new Error(error.detail || `HTTP error! status: ${response.status}`);
-  }
-
-  if (response.status === 204) {
-    return null;
-  }
-
   const text = await response.text();
-  if (!text) {
+  
+  if (!response.ok) {
+    let detail = response.statusText;
+
+    if (text) {
+      try {
+        const parsed = JSON.parse(text);
+        detail = parsed.detail || parsed.message || detail;
+      } catch {
+        detail = text;
+      }
+    }
+
+  throw new Error(detail || `HTTP error! status: ${response.status}`);
+  }
+
+  if (response.status === 204 || !text) {
     return null;
   }
 
