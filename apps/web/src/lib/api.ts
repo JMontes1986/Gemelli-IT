@@ -1,12 +1,6 @@
 // src/lib/api.ts
 const getApiBaseUrl = () => {
-  const envUrl = import.meta.env.PUBLIC_API_URL;
-  if (envUrl && envUrl.trim()) {
-    return envUrl.replace(/\/$/, '');
-  }
-
-  if (typeof window !== 'undefined') {
-    const { origin, hostname } = window.location;
+  const resolveForHost = (origin: string, hostname: string) => {
     const sanitizedOrigin = origin.replace(/\/$/, '');
 
     // En Netlify, el backend FastAPI se expone a través de una Netlify Function
@@ -21,6 +15,30 @@ const getApiBaseUrl = () => {
     }
 
     return `${sanitizedOrigin}/api`;
+    };
+
+  const envUrl = import.meta.env.PUBLIC_API_URL;
+  if (envUrl && envUrl.trim()) {
+    const sanitizedEnv = envUrl.trim().replace(/\/$/, '');
+
+    // Si se configura la URL del API como el mismo origen del front
+    // (por ejemplo, en Netlify), ajustamos automáticamente la ruta
+    // correcta para llegar a la función serverless o backend local.
+    if (typeof window !== 'undefined') {
+      const { origin, hostname } = window.location;
+      const sanitizedOrigin = origin.replace(/\/$/, '');
+
+      if (sanitizedEnv === sanitizedOrigin) {
+        return resolveForHost(sanitizedOrigin, hostname);
+      }
+    }
+
+    return sanitizedEnv;
+  }
+
+  if (typeof window !== 'undefined') {
+    const { origin, hostname } = window.location;
+    return resolveForHost(origin, hostname);
   }
 
   return 'http://localhost:8000';
