@@ -8,6 +8,7 @@ from typing import Optional, List, Literal, Dict, Any
 from datetime import datetime
 import os
 import hashlib
+import logging
 import json
 import hmac
 import unicodedata
@@ -37,6 +38,29 @@ AUDIT_SECRET = os.getenv("AUDIT_SECRET", "change-this-secret-key-in-production")
 EMAIL_REGEX = re.compile(r"^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$", re.IGNORECASE)
 ALLOWED_ROLES = {"DOCENTE", "ADMINISTRATIVO", "TI", "DIRECTOR", "LIDER_TI"}
 
+
+def _configure_logging() -> logging.Logger:
+    level = getattr(logging, os.getenv("LOG_LEVEL", "INFO").upper(), logging.INFO)
+    log_file = os.getenv("LOG_FILE")
+    handlers = [logging.StreamHandler()]
+
+    if log_file:
+        log_dir = os.path.dirname(log_file)
+        if log_dir:
+            os.makedirs(log_dir, exist_ok=True)
+        handlers.append(logging.FileHandler(log_file))
+
+    logging.basicConfig(
+        level=level,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        handlers=handlers,
+    )
+
+    return logging.getLogger("gemelli.api")
+
+
+logger = _configure_logging()
+
 class LazySupabaseClient:
     """Inicializa el cliente de Supabase únicamente cuando se necesita."""
 
@@ -57,6 +81,11 @@ class LazySupabaseClient:
         key = first_present(SUPABASE_KEY_ENV_KEYS)
 
         if not url or not key:
+            logger.error(
+                "Supabase configuration missing: url_present=%s key_present=%s",
+                bool(url),
+                bool(key),
+            )
             return None
 
         return url, key
@@ -72,6 +101,7 @@ class LazySupabaseClient:
 
         if self._client is None or self._config != config:
             url, key = config
+            logger.info("Inicializando cliente de Supabase con URL %s", url)
             self._client = create_client(url, key)
             self._config = config
 
@@ -98,14 +128,17 @@ def handle_supabase_error(
         message = getattr(error, "message", None) or (
             error.get("message") if isinstance(error, dict) else str(error)
         )
+        logger.error("Supabase devolvió error: %s", message)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=message or default_message)
 
     status_code = getattr(response, "status_code", None)
     if status_code and status_code >= 400:
+        logger.error("Supabase devolvió código HTTP %s", status_code)
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=default_message)
 
     data = getattr(response, "data", None)
     if require_data and (data is None or (isinstance(data, list) and len(data) == 0)):
+        logger.error("Supabase no devolvió datos cuando eran requeridos")
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=default_message)
 
     return data
@@ -234,6 +267,10 @@ class InventoryPermissionResponse(BaseModel):
     granted_at: Optional[datetime]
     granted_by: Optional[str]
 
+
+class SupabaseInsertProbe(BaseModel):
+    table: str = Field(default="debug_inserts", max_length=255)
+    payload: Dict[str, Any] = Field(default_factory=dict)
     
 class AdminUserBase(BaseModel):
     nombre: str = Field(..., min_length=2, max_length=150)
@@ -623,6 +660,33 @@ async def health_database_check():
         "records_checked": len(data or []),
     }
     
+
+
+@app.post("/debug/supabase-insert")
+async def supabase_insert_probe(request: SupabaseInsertProbe):
+    """Ejecuta un insert de prueba en Supabase y registra los errores detalladamente."""
+
+    try:
+        payload = request.payload or {}
+        payload.setdefault("inserted_at", datetime.utcnow().isoformat())
+
+        response = supabase.table(request.table).insert(payload).execute()
+        data = handle_supabase_error(
+            response, "Fallo al insertar prueba en Supabase", require_data=False
+        )
+        return {"status": "ok", "table": request.table, "data": data}
+    except HTTPException:
+        logger.error(
+            "Inserción de prueba en Supabase falló para tabla %s", request.table, exc_info=True
+        )
+        raise
+    except Exception as exc:
+        logger.exception("Error inesperado en inserción de prueba de Supabase")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"No se pudo ejecutar la inserción de prueba: {exc}",
+        )
+        
 # --- AUTH ---
 
 @app.get("/auth/profile", response_model=UserProfile)
