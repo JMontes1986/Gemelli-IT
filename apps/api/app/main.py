@@ -598,6 +598,31 @@ async def root():
 async def health():
     return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
 
+
+@app.get("/healt")
+async def health_database_check():
+    """Verifica la conexión con la base de datos de Supabase."""
+
+    try:
+        response = supabase.table("users").select("id").limit(1).execute()
+        data = handle_supabase_error(
+            response, "No se pudo conectar a la base de datos de Supabase"
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"No se pudo conectar a la base de datos: {exc}",
+        )
+
+    return {
+        "status": "healthy",
+        "database": "connected",
+        "timestamp": datetime.utcnow().isoformat(),
+        "records_checked": len(data or []),
+    }
+    
 # --- AUTH ---
 
 @app.get("/auth/profile", response_model=UserProfile)
