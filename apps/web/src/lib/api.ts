@@ -6,7 +6,7 @@ const getApiBaseUrl = () => {
     // En Netlify, el backend FastAPI se expone a través de una Netlify Function
     // ubicada en /.netlify/functions/main. Usamos la ruta directa para evitar
     // depender de redirecciones que pueden fallar en entornos previos.
-    if (hostname.endsWith('netlify.app')) {
+    if (hostname.endsWith('netlify.app') || hostname.endsWith('netlify.live')) {
       return `${sanitizedOrigin}/.netlify/functions/main`;
     }
     
@@ -14,8 +14,11 @@ const getApiBaseUrl = () => {
       return 'http://localhost:8000';
     }
 
-    return `${sanitizedOrigin}/api`;
-    };
+    // En dominios personalizados de Netlify también necesitamos apuntar
+    // directamente a la función serverless para evitar que Netlify devuelva
+    // un HTML estático ante redirecciones fallidas.
+    return `${sanitizedOrigin}/.netlify/functions/main`;
+  };
 
   const envUrl = import.meta.env.PUBLIC_API_URL;
   if (envUrl && envUrl.trim()) {
