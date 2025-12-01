@@ -78,7 +78,10 @@
   # Directorio que contiene la función Python que expone el backend de FastAPI
   # para Netlify Functions.
   directory = "../api/netlify-functions"
-  included_files = ["apps/api/app/**"]
+  # El patrón de archivos incluidos también debe ser relativo al directorio base.
+  # Al usar "apps/web" como base, debemos subir un nivel para empacar el backend
+  # de FastAPI dentro de la función serverless.
+  included_files = ["../api/app/**"]
   node_bundler = "esbuild"
   
 # Variables de entorno de contexto
