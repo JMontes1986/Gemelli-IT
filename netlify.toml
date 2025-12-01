@@ -2,10 +2,12 @@
 # Configuración de despliegue para Gemelli IT
 
 [build]
-  base = "apps/web"
-  publish = "dist"
-  command = "npm run build"
-  ignore = "bash ../scripts/netlify-ignore.sh"
+  # Ejecutamos los builds desde la raíz para evitar paths relativos con ".." que
+  # Netlify puede rechazar (por ejemplo, al empaquetar funciones). El frontend
+  # se construye dentro de apps/web y publicamos su carpeta dist.
+  publish = "apps/web/dist"
+  command = "npm --prefix apps/web run build"
+  ignore = "bash scripts/netlify-ignore.sh"
 
 [build.environment]
   NODE_VERSION = "18"
@@ -72,17 +74,14 @@
 
 # Funciones serverless
 [functions]
-  # The base directory is set to "apps/web", so the functions path must be
-  # resolved relative to that directory. Netlify expects the directory to
-  # point to the Python functions that proxy the FastAPI backend.
-  # Directorio que contiene la función Python que expone el backend de FastAPI
-  # para Netlify Functions.
-  directory = "../api/netlify-functions"
+  # Apuntamos al handler Python que expone el backend FastAPI como función
+  # serverless. Todas las rutas se resuelven desde la raíz del repo para evitar
+  # problemas de paths fuera de la base.
+  directory = "apps/api/netlify-functions"
   # El patrón de archivos incluidos también debe ser relativo al directorio base.
   # Al usar "apps/web" como base, debemos subir un nivel para empacar el backend
   # de FastAPI dentro de la función serverless.
   included_files = ["../api/app/**"]
-  node_bundler = "esbuild"
   
 # Variables de entorno de contexto
 [context.production.environment]
