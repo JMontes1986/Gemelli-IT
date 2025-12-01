@@ -66,16 +66,23 @@ async function fetchAPI(endpoint: string, options: RequestInit = {}) {
 
   const text = await response.text();
   const contentType = response.headers.get('content-type') || '';
+  const normalizedBody = text.trim();
+  const isHtmlResponse =
+    contentType.includes('text/html') ||
+    normalizedBody.startsWith('<!DOCTYPE') ||
+    normalizedBody.startsWith('<html');
+
+  if (isHtmlResponse) {
+    throw new Error(
+      `El backend no respondió correctamente. Verifica PUBLIC_API_URL y que la función serverless esté desplegada en /.netlify/functions/main (${API_URL}${endpoint}).`,
+    );
+  }
   
   if (!response.ok) {
     let detail = response.statusText;
 
-    if (text) {
-      if (contentType.includes('text/html')) {
-        detail =
-          'El backend no respondió correctamente. Verifica que las funciones serverless estén desplegadas.';
-      }
-      try {
+    
+    try {
         const parsed = JSON.parse(text);
         detail = parsed.detail || parsed.message || detail;
       } catch {
