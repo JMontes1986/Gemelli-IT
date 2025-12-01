@@ -7,11 +7,20 @@ const getApiBaseUrl = () => {
 
   if (typeof window !== 'undefined') {
     const { origin, hostname } = window.location;
+    const sanitizedOrigin = origin.replace(/\/$/, '');
+
+    // En Netlify, el backend FastAPI se expone a través de una Netlify Function
+    // ubicada en /.netlify/functions/main. Usamos la ruta directa para evitar
+    // depender de redirecciones que pueden fallar en entornos previos.
+    if (hostname.endsWith('netlify.app')) {
+      return `${sanitizedOrigin}/.netlify/functions/main`;
+    }
+    
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
       return 'http://localhost:8000';
     }
 
-    return `${origin.replace(/\/$/, '')}/api`;
+    return `${sanitizedOrigin}/api`;
   }
 
   return 'http://localhost:8000';
@@ -35,20 +44,27 @@ async function fetchAPI(endpoint: string, options: RequestInit = {}) {
   });
 
   const text = await response.text();
+  const contentType = response.headers.get('content-type') || '';
   
   if (!response.ok) {
     let detail = response.statusText;
 
     if (text) {
+      if (contentType.includes('text/html')) {
+        detail =
+          'El backend no respondió correctamente. Verifica que las funciones serverless estén desplegadas.';
+      }
       try {
         const parsed = JSON.parse(text);
         detail = parsed.detail || parsed.message || detail;
       } catch {
-        detail = text;
+        if (!detail) {
+          detail = text;
+        }
       }
     }
 
-  throw new Error(detail || `HTTP error! status: ${response.status}`);
+    throw new Error(detail || `HTTP error! status: ${response.status}`);
   }
 
   if (response.status === 204 || !text) {
