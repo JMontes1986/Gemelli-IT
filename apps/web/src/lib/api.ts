@@ -237,13 +237,16 @@ export const admin = {
     });
   },
 
-  updateUser: async (userId: string, data: Partial<{
-    nombre: string;
-    rol: string;
-    org_unit_id: string | null;
-    activo: boolean;
-    password: string;
-  }>) => {
+  updateUser: async (
+    userId: string,
+    data: Partial<{
+      nombre: string;
+      rol: string;
+      org_unit_id: string | null;
+      activo: boolean;
+      password: string;
+    }>
+  ) => {
     return fetchAPI(`/admin/users/${userId}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
