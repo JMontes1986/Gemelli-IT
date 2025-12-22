@@ -70,6 +70,11 @@ ERROR: insert or update on table "users" violates foreign key constraint "users_
 
 **Causa**: El usuario no existe en **Auth** (`auth.users`).
 
+**Ruta oficial para crear usuarios**:
+1. Inicia sesión en la app y ve a **Administración → Gestión de usuarios**.
+2. Crea el usuario desde el formulario (esto genera el usuario en Auth y su perfil en `public.users`).
+3. También puedes usar el endpoint `POST /admin/users` (requiere rol global admin).
+   
 **Solución**:
 1. Crear el usuario primero en Supabase **Auth > Users**.
 2. Copiar el UUID generado.
