@@ -24,7 +24,6 @@ cp .env.example .env
 psql "postgresql://postgres:[PASSWORD]@db.[PROJECT].supabase.co:5432/postgres" < infra/supabase.sql
 
 # Cargar datos de prueba
-psql "postgresql://postgres:[PASSWORD]@db.[PROJECT].supabase.co:5432/postgres" < infra/seed.sql
 ```
 
 ### 3. Iniciar desarrollo
