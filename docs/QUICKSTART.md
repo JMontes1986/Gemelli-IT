@@ -59,6 +59,24 @@ Password: Admin123!
 
 ---
 
+## 🐛 Errores comunes
+
+### Error FK al insertar usuarios en `public.users`
+
+**Error típico:**
+```
+ERROR: insert or update on table "users" violates foreign key constraint "users_id_fkey"
+```
+
+**Causa**: El usuario no existe en **Auth** (`auth.users`).
+
+**Solución**:
+1. Crear el usuario primero en Supabase **Auth > Users**.
+2. Copiar el UUID generado.
+3. Insertar el registro en `public.users` con ese UUID.
+
+---
+
 ## 🔧 Comandos Esenciales
 
 ### Desarrollo
