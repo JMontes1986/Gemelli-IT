@@ -26,7 +26,7 @@
     "lint:api": "cd apps/api && ruff check .",
     "lint:fix": "pnpm lint:web --fix && pnpm lint:api --fix",
     "format": "prettier --write \"**/*.{js,jsx,ts,tsx,json,css,md}\"",
-    "deploy": "pnpm build && netlify deploy --prod",
+    "deploy": "pnpm build && vercel --prod",
     "setup": "pnpm install && pnpm db:push && pnpm db:seed",
     "clean": "rm -rf node_modules apps/*/node_modules apps/web/dist apps/web/.astro"
   },
