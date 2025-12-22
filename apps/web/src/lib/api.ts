@@ -1,4 +1,5 @@
 // src/lib/api.ts
+import { getSupabaseClient } from './supabase';
 const getApiBaseUrl = () => {
   const resolveForHost = (origin: string, hostname: string) => {
     const sanitizedOrigin = origin.replace(/\/$/, '');
@@ -215,7 +216,14 @@ export const backups = {
 // Administración global
 export const admin = {
   listUsers: async () => {
-    return fetchAPI('/admin/users');
+    const supabase = getSupabaseClient();
+    const { data, error } = await supabase.from('users').select('*');
+
+    if (error) {
+      throw error;
+    }
+
+    return { data };
   },
 
   createUser: async (data: {
@@ -226,10 +234,17 @@ export const admin = {
     org_unit_id?: string | null;
     activo?: boolean;
   }) => {
-    return fetchAPI('/admin/users', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
+    const supabase = getSupabaseClient();
+    const { data: created, error } = await supabase
+      .from('users')
+      .insert([data])
+      .select();
+
+    if (error) {
+      throw error;
+    }
+
+    return { data: created };
   },
 
   updateUser: async (
@@ -242,13 +257,28 @@ export const admin = {
       password: string;
     }>
   ) => {
-    return fetchAPI(`/admin/users/${userId}`, {
-      method: 'PATCH',
-      body: JSON.stringify(data),
-    });
+    const supabase = getSupabaseClient();
+    const { data: updated, error } = await supabase
+      .from('users')
+      .update(data)
+      .eq('id', userId)
+      .select();
+
+    if (error) {
+      throw error;
+    }
+
+    return { data: updated };
   },
 
   listOrgUnits: async () => {
-    return fetchAPI('/admin/org-units');
+    const supabase = getSupabaseClient();
+    const { data, error } = await supabase.from('org_units').select('*');
+
+    if (error) {
+      throw error;
+    }
+
+    return { data };
   },
 };
