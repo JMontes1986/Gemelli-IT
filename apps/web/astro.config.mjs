@@ -3,11 +3,14 @@ import react from '@astrojs/react';
 import tailwind from '@astrojs/tailwind';
 import vercel from '@astrojs/vercel/serverless';
 
+const vercelAnalyticsId =
+  process.env.VERCEL_ANALYTICS_ID ?? process.env.PUBLIC_VERCEL_ANALYTICS_ID;
+
 export default defineConfig({
   output: 'hybrid',
   adapter: vercel({
-    webAnalytics: { enabled: true },
-    speedInsights: { enabled: true },
+    webAnalytics: { enabled: Boolean(vercelAnalyticsId) },
+    speedInsights: { enabled: Boolean(vercelAnalyticsId) },
     imageService: true,
     devImageService: 'sharp',
     functionPerRoute: false,
