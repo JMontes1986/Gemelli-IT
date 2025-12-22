@@ -6,6 +6,9 @@
     }
   ],
   "functions": {
+    "_render": {
+      "runtime": "nodejs20.x"
+    },
     "api/index.py": {
       "runtime": "python3.11"
     }
