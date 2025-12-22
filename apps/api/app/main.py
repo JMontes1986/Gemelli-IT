@@ -143,7 +143,22 @@ def handle_supabase_error(
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=default_message)
 
     return data
-        
+
+
+def extract_supabase_error_message(error: Any, default_message: str) -> str:
+    if not error:
+        return default_message
+    message = getattr(error, "message", None)
+    if not message and isinstance(error, dict):
+        message = (
+            error.get("message")
+            or error.get("error_description")
+            or error.get("error")
+        )
+    if not message:
+        message = str(error)
+    return message or default_message
+    
 app = FastAPI(
     title="Gemelli IT API",
     description="API para gestión de inventario y HelpDesk",
@@ -518,6 +533,10 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
             org_unit_nombre=org_unit_nombre,
         )
     except HTTPException:
+        try:
+            supabase.auth.admin.delete_user(new_user_id)
+        except Exception:
+            pass
         raise
     except Exception as e:
         raise HTTPException(status_code=401, detail=f"Error de autenticación: {str(e)}")
@@ -764,40 +783,60 @@ async def admin_create_user(payload: AdminUserCreate, user: UserProfile = Depend
             },
         })
     except Exception as exc:
-        raise HTTPException(status_code=400, detail=f"No se pudo crear el usuario en Supabase: {exc}")
+        raise HTTPException(status_code=400, detail=f"No se pudo crear el usuario en Auth: {exc}")
+
+    auth_error = getattr(auth_response, "error", None)
+    if auth_error:
+        message = extract_supabase_error_message(auth_error, "Error desconocido en Auth")
+        raise HTTPException(status_code=400, detail=f"No se pudo crear el usuario en Auth: {message}")
 
     new_user = getattr(auth_response, "user", None)
-    if new_user is None:
-        raise HTTPException(status_code=400, detail="Supabase no devolvió el usuario creado")
+    new_user_id = getattr(new_user, "id", None) if new_user else None
+    if not new_user_id:
+        raise HTTPException(status_code=400, detail="Supabase Auth no devolvió el UUID del usuario creado"
 
     profile_payload = {
-        "id": new_user.id,
+        "id": new_user_id,
         "nombre": payload.nombre,
         "email": normalized_email,
         "rol": normalized_role,
         "org_unit_id": payload.org_unit_id,
         "activo": payload.activo,
     }
-    insert_error_message = "Debe existir en auth.users"
-    if profile_payload.get("id"):
-        insert_error_message = f"{insert_error_message} (id: {profile_payload['id']})"
         
     try:
         insert_response = supabase.table("users").insert(profile_payload).execute()
-        if getattr(insert_response, "error", None):
-            raise HTTPException(status_code=400, detail=insert_error_message)
+        insert_error = getattr(insert_response, "error", None)
+        if insert_error:
+            message = extract_supabase_error_message(
+                insert_error,
+                "No se pudo crear el perfil del usuario en public.users",
+            )
+            raise HTTPException(
+                status_code=400,
+                detail=f"No se pudo crear el perfil en public.users: {message}",
+            )
+        status_code = getattr(insert_response, "status_code", None)
+        if status_code and status_code >= 400:
+            raise HTTPException(
+                status_code=400,
+                detail="No se pudo crear el perfil en public.users",
+            )
     except HTTPException:
         raise
     except Exception as exc:
         try:
-            supabase.auth.admin.delete_user(new_user.id)
+            supabase.auth.admin.delete_user(new_user_id)
         except Exception:
             pass
-        raise HTTPException(status_code=400, detail=insert_error_message)
+        raise HTTPException(
+            status_code=400,
+            detail=f"No se pudo crear el perfil en public.users: {exc}",
+        )
 
     await register_audit_event(
         "CREATE_USER",
-        new_user.id,
+        new_user_id,
         user.id,
         {
             "email": normalized_email,
@@ -807,7 +846,7 @@ async def admin_create_user(payload: AdminUserCreate, user: UserProfile = Depend
         },
     )
 
-    return {"data": fetch_user_profile_by_id(new_user.id)}
+    return {"data": fetch_user_profile_by_id(new_user_id)}
 
 
 @app.patch("/admin/users/{user_id}")
