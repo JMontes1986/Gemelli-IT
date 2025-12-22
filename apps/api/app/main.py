@@ -336,6 +336,108 @@ class AdminUserUpdate(BaseModel):
         if len(cleaned) < 2:
             raise ValueError("El nombre debe tener al menos 2 caracteres")
         return cleaned
+
+def create_user_with_profile(payload: AdminUserCreate) -> Dict[str, Any]:
+    normalized_email = normalize_email_value(payload.email)
+    if not normalized_email or not EMAIL_REGEX.match(normalized_email):
+        raise HTTPException(status_code=422, detail="Correo electrónico inválido")
+
+    normalized_role = ensure_allowed_role(payload.rol)
+
+    try:
+        existing = (
+            supabase.table("users")
+            .select("id")
+            .eq("email", normalized_email)
+            .limit(1)
+            .execute()
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"No se pudo verificar usuarios existentes: {exc}")
+
+    if existing.data:
+        raise HTTPException(status_code=409, detail="El correo electrónico ya está registrado")
+
+    try:
+        auth_response = supabase.auth.admin.create_user({
+            "email": normalized_email,
+            "password": payload.password,
+            "email_confirm": True,
+            "user_metadata": {
+                "full_name": payload.nombre,
+                "role": normalized_role,
+                "org_unit_id": payload.org_unit_id,
+                "active": payload.activo,
+            },
+        })
+    except Exception:
+        logger.exception("No se pudo crear el usuario en Supabase Auth")
+        raise HTTPException(status_code=400, detail=AUTH_CREATE_ERROR_MESSAGE)
+
+    auth_error = getattr(auth_response, "error", None)
+    if auth_error:
+        message = extract_supabase_error_message(auth_error, "Error desconocido en Auth")
+        logger.error("Supabase Auth devolvió error al crear usuario: %s", message)
+        raise HTTPException(status_code=400, detail=AUTH_CREATE_ERROR_MESSAGE)
+
+    new_user = getattr(auth_response, "user", None)
+    new_user_id = getattr(new_user, "id", None) if new_user else None
+    if not new_user_id:
+        raise HTTPException(status_code=400, detail=AUTH_UUID_MISSING_MESSAGE)
+
+    profile_payload = {
+        "id": new_user_id,
+        "nombre": payload.nombre,
+        "email": normalized_email,
+        "rol": normalized_role,
+        "org_unit_id": payload.org_unit_id,
+        "activo": payload.activo,
+    }
+
+    try:
+        insert_response = supabase.table("users").insert(profile_payload).execute()
+        insert_error = getattr(insert_response, "error", None)
+        if insert_error:
+            message = extract_supabase_error_message(
+                insert_error,
+                "No se pudo crear el perfil del usuario en public.users",
+            )
+            logger.error("Supabase users insert devolvió error: %s", message)
+            raise HTTPException(
+                status_code=400,
+                detail=PUBLIC_USERS_INSERT_ERROR_MESSAGE,
+            )
+        status_code = getattr(insert_response, "status_code", None)
+        if status_code and status_code >= 400:
+            logger.error("Supabase users insert devolvió status %s", status_code)
+            raise HTTPException(
+                status_code=400,
+                detail=PUBLIC_USERS_INSERT_ERROR_MESSAGE,
+            )
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error inesperado al crear perfil en public.users")
+        try:
+            supabase.auth.admin.delete_user(new_user_id)
+        except Exception:
+            pass
+        raise HTTPException(
+            status_code=400,
+            detail=PUBLIC_USERS_INSERT_ERROR_MESSAGE,
+        )
+
+    return {
+        "id": new_user_id,
+        "email": normalized_email,
+        "rol": normalized_role,
+        "org_unit_id": payload.org_unit_id,
+        "activo": payload.activo,
+        "profile": fetch_user_profile_by_id(new_user_id),
+    }
+    
 # ==================== AUDIT HASH SYSTEM ====================
 
 def generate_audit_hash(action: str, entity_id: str, user_id: str, data: dict = None) -> dict:
@@ -729,6 +831,26 @@ async def get_profile(user: UserProfile = Depends(get_current_user)):
     """Obtener perfil del usuario autenticado"""
     return user
 
+
+@app.post("/auth/register", status_code=201)
+async def register_user(payload: AdminUserCreate):
+    """Registro público de usuarios con perfil inicial."""
+    result = create_user_with_profile(payload)
+
+    await register_audit_event(
+        "SELF_REGISTER",
+        result["id"],
+        result["id"],
+        {
+            "email": result["email"],
+            "rol": result["rol"],
+            "org_unit_id": result["org_unit_id"],
+            "activo": result["activo"],
+        },
+    )
+
+    return {"data": result["profile"]}
+    
 # --- ADMIN ---
 
 @app.get("/admin/users")
@@ -751,110 +873,21 @@ async def admin_list_users(user: UserProfile = Depends(require_global_admin())):
 
 @app.post("/admin/users", status_code=201)
 async def admin_create_user(payload: AdminUserCreate, user: UserProfile = Depends(require_global_admin())):
-    normalized_email = normalize_email_value(payload.email)
-    if not normalized_email or not EMAIL_REGEX.match(normalized_email):
-        raise HTTPException(status_code=422, detail="Correo electrónico inválido")
-
-    normalized_role = ensure_allowed_role(payload.rol)
-
-    try:
-        existing = (
-            supabase.table("users")
-            .select("id")
-            .eq("email", normalized_email)
-            .limit(1)
-            .execute()
-        )
-    except HTTPException:
-        raise
-    except Exception as exc:
-        raise HTTPException(status_code=503, detail=f"No se pudo verificar usuarios existentes: {exc}")
-
-    if existing.data:
-        raise HTTPException(status_code=409, detail="El correo electrónico ya está registrado")
-
-    try:
-        auth_response = supabase.auth.admin.create_user({
-            "email": normalized_email,
-            "password": payload.password,
-            "email_confirm": True,
-            "user_metadata": {
-                "full_name": payload.nombre,
-                "role": normalized_role,
-                "org_unit_id": payload.org_unit_id,
-                "active": payload.activo,
-            },
-        })
-    except Exception:
-        logger.exception("No se pudo crear el usuario en Supabase Auth")
-        raise HTTPException(status_code=400, detail=AUTH_CREATE_ERROR_MESSAGE)
-
-    auth_error = getattr(auth_response, "error", None)
-    if auth_error:
-        message = extract_supabase_error_message(auth_error, "Error desconocido en Auth")
-        logger.error("Supabase Auth devolvió error al crear usuario: %s", message)
-        raise HTTPException(status_code=400, detail=AUTH_CREATE_ERROR_MESSAGE)
-
-    new_user = getattr(auth_response, "user", None)
-    new_user_id = getattr(new_user, "id", None) if new_user else None
-    if not new_user_id:
-        raise HTTPException(status_code=400, detail=AUTH_UUID_MISSING_MESSAGE)
-
-    profile_payload = {
-        "id": new_user_id,
-        "nombre": payload.nombre,
-        "email": normalized_email,
-        "rol": normalized_role,
-        "org_unit_id": payload.org_unit_id,
-        "activo": payload.activo,
-    }
-        
-    try:
-        insert_response = supabase.table("users").insert(profile_payload).execute()
-        insert_error = getattr(insert_response, "error", None)
-        if insert_error:
-            message = extract_supabase_error_message(
-                insert_error,
-                "No se pudo crear el perfil del usuario en public.users",
-            )
-            logger.error("Supabase users insert devolvió error: %s", message)
-            raise HTTPException(
-                status_code=400,
-                detail=PUBLIC_USERS_INSERT_ERROR_MESSAGE,
-            )
-        status_code = getattr(insert_response, "status_code", None)
-        if status_code and status_code >= 400:
-            logger.error("Supabase users insert devolvió status %s", status_code)
-            raise HTTPException(
-                status_code=400,
-                detail=PUBLIC_USERS_INSERT_ERROR_MESSAGE,
-            )
-    except HTTPException:
-        raise
-    except Exception:
-        logger.exception("Error inesperado al crear perfil en public.users")
-        try:
-            supabase.auth.admin.delete_user(new_user_id)
-        except Exception:
-            pass
-        raise HTTPException(
-            status_code=400,
-            detail=PUBLIC_USERS_INSERT_ERROR_MESSAGE,
-        )
-
+    result = create_user_with_profile(payload)
+    
     await register_audit_event(
         "CREATE_USER",
-        new_user_id,
+        result["id"],
         user.id,
         {
-            "email": normalized_email,
-            "rol": normalized_role,
-            "org_unit_id": payload.org_unit_id,
-            "activo": payload.activo,
+           "email": result["email"],
+            "rol": result["rol"],
+            "org_unit_id": result["org_unit_id"],
+            "activo": result["activo"],
         },
     )
 
-    return {"data": fetch_user_profile_by_id(new_user_id)}
+    return {"data": result["profile"]}
 
 
 @app.patch("/admin/users/{user_id}")
