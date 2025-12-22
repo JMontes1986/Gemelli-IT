@@ -1,9 +1,17 @@
 {
+  "version": 2,
   "buildCommand": "npm --prefix apps/web run build",
   "outputDirectory": "apps/web/.vercel/output",
+  "framework": null,
+  "regions": ["iad1"],
   "functions": {
-    "apps/web/.vercel/output/functions/_render.func/index.js": {
-      "runtime": "nodejs20.x"
+    "_render": {
+      "runtime": "nodejs20.x",
+      "maxDuration": 30,
+      "memory": 1024
     }
+  },
+  "env": {
+    "NODE_VERSION": "20"
   }
 }
