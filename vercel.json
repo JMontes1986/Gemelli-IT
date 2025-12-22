@@ -1,7 +1,7 @@
 {
   "version": 2,
-  "buildCommand": "npm --prefix apps/web run build",
-  "outputDirectory": "apps/web/.vercel/output",
+  "buildCommand": "npm run build",
+  "outputDirectory": ".vercel/output",
   "framework": null,
   "regions": ["iad1"],
   "functions": {
