@@ -1,10 +1,9 @@
 {
-"buildCommand": "npm --prefix apps/web run build",
+  "buildCommand": "npm --prefix apps/web run build",
   "outputDirectory": "apps/web/.vercel/output",
   "functions": {
-    "_render": {
-      "runtime": "nodejs20.x",
-      "maxDuration": 30
+    "apps/web/.vercel/output/functions/_render.func/index.js": {
+      "runtime": "nodejs20.x"
     }
-   }
+  }
 }
