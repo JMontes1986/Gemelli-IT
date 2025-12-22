@@ -310,6 +310,7 @@ Supabase hace backups automáticos, pero es buena práctica tener copias propias
 1. Auth > Users > Add User
 2. Copiar UUID
 3. Insertar en tabla `users`
+> **Nota:** no insertes directo en `public.users` sin crear primero el usuario en **Auth** (tabla `auth.users`), o fallará la FK.
 
 **Opción 3: API**
 ```bash
