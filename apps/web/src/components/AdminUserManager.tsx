@@ -30,6 +30,18 @@ interface MessageState {
   text: string;
 }
 
+const getErrorMessage = (error: unknown, fallback: string) => {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  if (typeof error === 'string' && error.trim()) {
+    return error;
+  }
+
+  return fallback;
+};
+
 const ROLE_OPTIONS = [
   { value: 'DOCENTE', label: 'Docente' },
   { value: 'ADMINISTRATIVO', label: 'Administrativo' },
@@ -82,7 +94,7 @@ const AdminUserManager: React.FC = () => {
       runIfMounted(() =>
         setMessage({
           type: 'error',
-          text: error?.message || 'No se pudieron cargar los usuarios.',
+          text: getErrorMessage(error, 'No se pudieron cargar los usuarios.'),
         })
       );
     } finally {
@@ -99,7 +111,7 @@ const AdminUserManager: React.FC = () => {
       runIfMounted(() =>
         setMessage({
           type: 'error',
-          text: error?.message || 'No se pudieron cargar las unidades organizacionales.',
+          text: getErrorMessage(error, 'No se pudieron cargar las unidades organizacionales.'),
         })
       );
     } finally {
@@ -163,7 +175,7 @@ const AdminUserManager: React.FC = () => {
       runIfMounted(() =>
         setMessage({
           type: 'error',
-          text: error?.message || 'No se pudo crear el usuario.',
+          text: getErrorMessage(error, 'No se pudo crear el usuario.'),
         })
       );
     } finally {
@@ -189,7 +201,7 @@ const AdminUserManager: React.FC = () => {
       runIfMounted(() =>
         setMessage({
           type: 'error',
-          text: error?.message || 'No se pudo actualizar el rol del usuario.',
+          text: getErrorMessage(error, 'No se pudo actualizar el rol del usuario.'),
         })
       );
     } finally {
@@ -216,7 +228,7 @@ const AdminUserManager: React.FC = () => {
       runIfMounted(() =>
         setMessage({
           type: 'error',
-          text: error?.message || 'No se pudo actualizar la unidad organizacional.',
+          text: getErrorMessage(error, 'No se pudo actualizar la unidad organizacional.'),
         })
       );
     } finally {
@@ -238,7 +250,7 @@ const AdminUserManager: React.FC = () => {
       runIfMounted(() =>
         setMessage({
           type: 'error',
-          text: error?.message || 'No se pudo actualizar el estado del usuario.',
+          text: getErrorMessage(error, 'No se pudo actualizar el estado del usuario.'),
         })
       );
     } finally {
@@ -275,7 +287,7 @@ const AdminUserManager: React.FC = () => {
       runIfMounted(() =>
         setMessage({
           type: 'error',
-          text: error?.message || 'No se pudo restablecer la contraseña.',
+          text: getErrorMessage(error, 'No se pudo restablecer la contraseña.'),
         })
       );
     } finally {
