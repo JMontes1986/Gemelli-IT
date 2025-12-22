@@ -221,7 +221,7 @@ gemelli-it/
 ### 1. Simplicidad
 ```bash
 # Antes (9 pasos)
-1. Instalar Node.js
+1. Instalar Node.js 24.12.0
 2. Instalar Python
 3. Configurar Supabase
 4. Configurar OpenAI
@@ -232,7 +232,7 @@ gemelli-it/
 9. Iniciar desarrollo
 
 # Ahora (6 pasos)
-1. Instalar Node.js
+1. Instalar Node.js 24.12.0
 2. Instalar Python
 3. Configurar Supabase
 4. Configurar OpenAI
