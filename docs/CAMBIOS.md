@@ -283,7 +283,6 @@ Hash Chain:
 - ✏️ `package.json` - Eliminados scripts blockchain
 - ✏️ `apps/api/app/main.py` - Nuevo sistema de auditoría
 - ✏️ `infra/supabase.sql` - Nueva estructura audit_chain
-- ✏️ `infra/seed.sql` - Nuevos datos de ejemplo
 - ✏️ `docs/QUICKSTART.md` - Proceso actualizado
 - ✏️ `netlify.toml` - Configuración actualizada
 
