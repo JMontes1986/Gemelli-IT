@@ -483,11 +483,22 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
             raise HTTPException(status_code=401, detail="Usuario no autenticado")
         
         # Obtener datos completos del usuario
-        user_data = supabase.table("users").select(
-            "id, nombre, email, rol, org_unit_id, org_units(nombre)"
-        ).eq("id", user_response.user.id).single().execute()
-        
-        data = user_data.data or {}
+        user_data_response = (
+            supabase.table("users")
+            .select("id, nombre, email, rol, org_unit_id, org_units(nombre)")
+            .eq("id", user_response.user.id)
+            .single()
+            .execute()
+        )
+
+        data = handle_supabase_error(
+            user_data_response,
+            "No se pudo obtener el perfil del usuario",
+            require_data=True,
+        )
+
+        if not isinstance(data, dict) or not data.get("id"):
+            raise HTTPException(status_code=401, detail="Usuario eliminado o no encontrado")
 
         raw_role = data.get("rol")
         normalized_role = ensure_allowed_role(raw_role)
