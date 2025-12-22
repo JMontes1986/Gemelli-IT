@@ -226,23 +226,17 @@ pnpm deploy           # Deploy completo
 
 ## 🚢 Despliegue en Producción
 
-### Netlify (Frontend + Functions)
+### Vercel (Backend)
 
-- **Proveedor**: Netlify. El archivo [`netlify.toml`](./netlify.toml) declara el comando de build (`npm --prefix apps/web run build`) y la carpeta a publicar (`apps/web/dist`). Las funciones serverless viven en `apps/api/netlify-functions` y se empaquetan incluyendo `apps/api/app/**`.
-- **Variables requeridas** (definirlas en Netlify UI y en tu `.env` local):
-  - `SUPABASE_URL` / `PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE` (o `SUPABASE_SERVICE_ROLE_KEY`), `SUPABASE_ANON_KEY`
-  - `JWT_SECRET`, `AUDIT_SECRET`
-  - `OPENAI_API_KEY`, `OPENAI_MODEL`
-  - `PUBLIC_SUPABASE_ANON_KEY`, `PUBLIC_SUPABASE_URL`, `PUBLIC_API_URL`
-  - Opcionales: `LOG_LEVEL`, `LOG_FILE`, `SMTP_*`
-- **Revisión de despliegues**: el repositorio no incluye pipelines CI/CD; valida el historial de Deploys directamente en Netlify (Deploy Logs). Si se usa CLI, `netlify status` muestra el estado del último sitio autenticado.
-- **Ejecutar funciones en local**:
-  1. Instala dependencias de Python: `pip install -r apps/api/netlify-functions/requirements.txt`.
-  2. Arranca las funciones: `npx netlify-cli functions:serve --functions apps/api/netlify-functions --port 9999`.
-  3. Prueba salud: `curl http://localhost:9999/.netlify/functions/main/health`.
-- **Redeploy manual**: desde Netlify UI selecciona *Trigger deploy > Clear cache and deploy site* o ejecuta `netlify deploy --prod --build` (requiere `NETLIFY_AUTH_TOKEN` y `NETLIFY_SITE_ID`).
-- **Pruebas de endpoints desplegados**: el redirect `/api/*` apunta a `/.netlify/functions/main`. Valida `https://<tu-sitio>.netlify.app/api/health` y agrega monitores si es posible.
-- **Test automatizado de salud**: `apps/api/tests/test_health.py` verifica que `/health` responda correctamente antes de publicar.
+- **Variables requeridas** (definirlas en Vercel > Project Settings > Environment Variables):
+  - `SUPABASE_URL` (formato `https://<ref>.supabase.co`)
+  - `SUPABASE_ANON_KEY`
+  - `SUPABASE_SERVICE_ROLE` o `SUPABASE_SERVICE_ROLE_KEY` (si el backend lo requiere)
+  - Otras variables del backend listadas en este README (ej. `JWT_SECRET`, `AUDIT_SECRET`, `OPENAI_API_KEY`).
+- **Uso en runtime**: el backend usa `PUBLIC_SUPABASE_URL` y `PUBLIC_SUPABASE_ANON_KEY` en `apps/api/app/main.py`. Asegura que las variables de Vercel estén mapeadas a esos nombres.
+- **Redeploy**: tras guardar variables en Vercel, ejecuta un redeploy del backend para que tome la configuración.
+- **Salud**: valida el endpoint de salud (`/health`) según la configuración de tu API.
+- 
 
 ### Supabase (Database)
 ```bash
