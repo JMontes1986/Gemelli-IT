@@ -9,11 +9,12 @@ type SupabaseConfig = {
 let client: SupabaseClient | null = null;
 let clientConfig: SupabaseConfig | null = null;
 
-const MISSING_ENV_MESSAGE = 'Supabase no está configurado. Define PUBLIC_SUPABASE_URL y PUBLIC_SUPABASE_ANON_KEY.';
+const MISSING_ENV_MESSAGE =
+  'Supabase no está configurado. Define PUBLIC_SUPABASE_URL y PUBLIC_SUPABASE_ANON_KEY (o sus equivalentes SUPABASE_URL y SUPABASE_ANON_KEY para builds).';
 
 function resolveSupabaseConfig(): SupabaseConfig | null {
-  const url = import.meta.env.PUBLIC_SUPABASE_URL;
-  const anonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
+  const url = import.meta.env.PUBLIC_SUPABASE_URL ?? import.meta.env.SUPABASE_URL;
+  const anonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY ?? import.meta.env.SUPABASE_ANON_KEY;
 
   if (!url || !anonKey) {
     return null;
