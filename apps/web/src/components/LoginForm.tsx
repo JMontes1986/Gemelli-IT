@@ -1,7 +1,7 @@
 // src/components/LoginForm.tsx
 import React, { useEffect, useState } from 'react';
 import { Activity, Mail, Lock, AlertCircle, User, Building, Shield } from 'lucide-react';
-import { admin } from '../lib/api';
+import { auth } from '../lib/api';
 import { tryGetSupabaseClient } from '../lib/supabase';
 
 const LoginForm: React.FC = () => {
@@ -85,7 +85,7 @@ const LoginForm: React.FC = () => {
           throw new Error('Las contraseñas no coinciden');
         }
 
-        await admin.createUser({
+        await auth.register({
           nombre: fullName,
           email,
           password,
