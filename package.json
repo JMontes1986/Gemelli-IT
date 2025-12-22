@@ -15,8 +15,7 @@
     "build:web": "cd apps/web && pnpm build",
     "build:api": "cd apps/api && pip install -r requirements.txt",
     "db:push": "psql $SUPABASE_URL < infra/supabase.sql",
-    "db:seed": "psql $SUPABASE_URL < infra/seed.sql",
-    "db:reset": "pnpm db:push && pnpm db:seed",
+   "db:reset": "pnpm db:push",
     "test": "pnpm test:web && pnpm test:api",
     "test:web": "cd apps/web && pnpm test",
     "test:api": "cd apps/api && pytest",
@@ -27,7 +26,7 @@
     "lint:fix": "pnpm lint:web --fix && pnpm lint:api --fix",
     "format": "prettier --write \"**/*.{js,jsx,ts,tsx,json,css,md}\"",
     "deploy": "pnpm build && vercel --prod",
-    "setup": "pnpm install && pnpm db:push && pnpm db:seed",
+   "setup": "pnpm install && pnpm db:push",
     "clean": "rm -rf node_modules apps/*/node_modules apps/web/dist apps/web/.astro"
   },
   "devDependencies": {
