@@ -50,6 +50,7 @@ const API_URL = getApiBaseUrl();
 // Helper para hacer requests autenticados
 async function fetchAPI(endpoint: string, options: RequestInit = {}) {
   const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+  const url = `${API_URL}${endpoint}`;
   
   const headers = {
     'Content-Type': 'application/json',
@@ -57,7 +58,7 @@ async function fetchAPI(endpoint: string, options: RequestInit = {}) {
     ...options.headers,
   };
 
-  const response = await fetch(`${API_URL}${endpoint}`, {
+  const response = await fetch(url, {
     ...options,
     headers,
   });
@@ -72,7 +73,7 @@ async function fetchAPI(endpoint: string, options: RequestInit = {}) {
 
   if (isHtmlResponse) {
     throw new Error(
-      `El backend no respondió correctamente. Verifica PUBLIC_API_URL y que la función serverless esté desplegada en /api (${API_URL}${endpoint}).`,
+      `El backend no respondió correctamente al solicitar ${url}. Verifica PUBLIC_API_URL y que la función serverless esté desplegada en /api.`,
     );
   }
   
