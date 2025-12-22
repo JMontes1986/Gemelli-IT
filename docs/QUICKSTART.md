@@ -49,7 +49,7 @@ Password: Admin123!
 
 ## 📋 Checklist de Configuración
 
-- [ ] Node.js >= 18 instalado
+- [ ] Node.js 24.12.0 instalado
 - [ ] Python >= 3.10 instalado
 - [ ] pnpm >= 8 instalado
 - [ ] Cuenta en Supabase creada
