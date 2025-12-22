@@ -1,0 +1,13 @@
+{
+  "functions": {
+    "api/**": {
+      "runtime": "python3.11",
+      "maxDuration": 30,
+      "memory": 1024,
+      "includeFiles": "../api/**"
+    }
+  },
+  "env": {
+    "NODE_VERSION": "20"
+  }
+}
