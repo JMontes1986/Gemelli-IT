@@ -38,6 +38,9 @@ ROOT_PATH = os.getenv("ROOT_PATH", "")
 
 EMAIL_REGEX = re.compile(r"^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$", re.IGNORECASE)
 ALLOWED_ROLES = {"DOCENTE", "ADMINISTRATIVO", "TI", "DIRECTOR", "LIDER_TI"}
+AUTH_CREATE_ERROR_MESSAGE = "El usuario no fue creado en Auth"
+AUTH_UUID_MISSING_MESSAGE = "Falta UUID del usuario creado en Auth"
+PUBLIC_USERS_INSERT_ERROR_MESSAGE = "El perfil no fue creado en public.users"
 
 
 def _configure_logging() -> logging.Logger:
@@ -782,18 +785,20 @@ async def admin_create_user(payload: AdminUserCreate, user: UserProfile = Depend
                 "active": payload.activo,
             },
         })
-    except Exception as exc:
-        raise HTTPException(status_code=400, detail=f"No se pudo crear el usuario en Auth: {exc}")
+    except Exception:
+        logger.exception("No se pudo crear el usuario en Supabase Auth")
+        raise HTTPException(status_code=400, detail=AUTH_CREATE_ERROR_MESSAGE)
 
     auth_error = getattr(auth_response, "error", None)
     if auth_error:
         message = extract_supabase_error_message(auth_error, "Error desconocido en Auth")
-        raise HTTPException(status_code=400, detail=f"No se pudo crear el usuario en Auth: {message}")
+        logger.error("Supabase Auth devolvió error al crear usuario: %s", message)
+        raise HTTPException(status_code=400, detail=AUTH_CREATE_ERROR_MESSAGE)
 
     new_user = getattr(auth_response, "user", None)
     new_user_id = getattr(new_user, "id", None) if new_user else None
     if not new_user_id:
-        raise HTTPException(status_code=400, detail="Supabase Auth no devolvió el UUID del usuario creado"
+        raise HTTPException(status_code=400, detail=AUTH_UUID_MISSING_MESSAGE)
 
     profile_payload = {
         "id": new_user_id,
@@ -812,26 +817,29 @@ async def admin_create_user(payload: AdminUserCreate, user: UserProfile = Depend
                 insert_error,
                 "No se pudo crear el perfil del usuario en public.users",
             )
+            logger.error("Supabase users insert devolvió error: %s", message)
             raise HTTPException(
                 status_code=400,
-                detail=f"No se pudo crear el perfil en public.users: {message}",
+                detail=PUBLIC_USERS_INSERT_ERROR_MESSAGE,
             )
         status_code = getattr(insert_response, "status_code", None)
         if status_code and status_code >= 400:
+            logger.error("Supabase users insert devolvió status %s", status_code)
             raise HTTPException(
                 status_code=400,
-                detail="No se pudo crear el perfil en public.users",
+                detail=PUBLIC_USERS_INSERT_ERROR_MESSAGE,
             )
     except HTTPException:
         raise
-    except Exception as exc:
+    except Exception:
+        logger.exception("Error inesperado al crear perfil en public.users")
         try:
             supabase.auth.admin.delete_user(new_user_id)
         except Exception:
             pass
         raise HTTPException(
             status_code=400,
-            detail=f"No se pudo crear el perfil en public.users: {exc}",
+            detail=PUBLIC_USERS_INSERT_ERROR_MESSAGE,
         )
 
     await register_audit_event(
