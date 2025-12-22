@@ -78,18 +78,15 @@ async function fetchAPI(endpoint: string, options: RequestInit = {}) {
   
   if (!response.ok) {
     let detail = response.statusText;
-
     
     try {
         const parsed = JSON.parse(text);
-        detail = parsed.detail || parsed.message || detail;
-      } catch {
-        if (!detail) {
-          detail = text;
-        }
+      detail = parsed.detail || parsed.message || detail;
+    } catch {
+      if (!detail) {
+        detail = text;
       }
     }
-
     throw new Error(detail || `HTTP error! status: ${response.status}`);
   }
 
