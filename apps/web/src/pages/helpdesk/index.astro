@@ -14,13 +14,3 @@ import TicketList from '../../components/TicketList';
     <TicketList client:load />
   </div>
 </MainLayout>
-
-<script>
-  // Verificar autenticación
-  if (typeof window !== 'undefined') {
-    const token = localStorage.getItem('access_token');
-    if (!token) {
-      window.location.href = '/login';
-    }
-  }
-</script>
