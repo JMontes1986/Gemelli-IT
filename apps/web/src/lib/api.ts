@@ -21,7 +21,23 @@ const getApiBaseUrl = () => {
   const envUrl = import.meta.env.PUBLIC_API_URL;
   if (envUrl && envUrl.trim()) {
     const sanitizedEnv = envUrl.trim().replace(/\/$/, '');
+    const looksLikeUrl =
+      sanitizedEnv.startsWith('http://') ||
+      sanitizedEnv.startsWith('https://') ||
+      sanitizedEnv.startsWith('/');
 
+    if (!looksLikeUrl) {
+      if (typeof window !== 'undefined') {
+        // Evita usar valores inválidos (por ejemplo, keys de terceros) como URL base.
+        console.warn(
+          'PUBLIC_API_URL no parece una URL válida. Se usará el origen actual con /api.',
+        );
+      }
+      return typeof window !== 'undefined'
+        ? resolveForHost(window.location.origin, window.location.hostname)
+        : 'http://localhost:8000';
+    }
+    
     // Si se configura la URL del API como el mismo origen del front
     // (por ejemplo, en Vercel), ajustamos automáticamente la ruta
     // correcta para llegar a la función serverless o backend local.
