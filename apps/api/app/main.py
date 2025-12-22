@@ -778,9 +778,14 @@ async def admin_create_user(payload: AdminUserCreate, user: UserProfile = Depend
         "org_unit_id": payload.org_unit_id,
         "activo": payload.activo,
     }
-
+    insert_error_message = "Debe existir en auth.users"
+    if profile_payload.get("id"):
+        insert_error_message = f"{insert_error_message} (id: {profile_payload['id']})"
+        
     try:
-        supabase.table("users").insert(profile_payload).execute()
+        insert_response = supabase.table("users").insert(profile_payload).execute()
+        if getattr(insert_response, "error", None):
+            raise HTTPException(status_code=400, detail=insert_error_message)
     except HTTPException:
         raise
     except Exception as exc:
@@ -788,7 +793,7 @@ async def admin_create_user(payload: AdminUserCreate, user: UserProfile = Depend
             supabase.auth.admin.delete_user(new_user.id)
         except Exception:
             pass
-        raise HTTPException(status_code=400, detail=f"No se pudo guardar el perfil del usuario: {exc}")
+        raise HTTPException(status_code=400, detail=insert_error_message)
 
     await register_audit_event(
         "CREATE_USER",
