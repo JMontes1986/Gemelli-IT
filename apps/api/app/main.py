@@ -34,6 +34,7 @@ SUPABASE_KEY_ENV_KEYS = (
 )
 JWT_SECRET = os.getenv("JWT_SECRET")
 AUDIT_SECRET = os.getenv("AUDIT_SECRET", "change-this-secret-key-in-production")
+ROOT_PATH = os.getenv("ROOT_PATH", "")
 
 EMAIL_REGEX = re.compile(r"^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$", re.IGNORECASE)
 ALLOWED_ROLES = {"DOCENTE", "ADMINISTRATIVO", "TI", "DIRECTOR", "LIDER_TI"}
@@ -146,13 +147,14 @@ def handle_supabase_error(
 app = FastAPI(
     title="Gemelli IT API",
     description="API para gestión de inventario y HelpDesk",
-    version="1.0.0"
+    version="1.0.0",
+    root_path=ROOT_PATH,
 )
 
 # CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:4321", "https://*.netlify.app"],
+    allow_origins=["http://localhost:4321", "https://*.vercel.app"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
