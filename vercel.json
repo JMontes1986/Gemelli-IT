@@ -1,12 +1,16 @@
 {
   "version": 2,
   "buildCommand": "npm run build",
-  "outputDirectory": ".vercel/output",
   "framework": null,
   "regions": ["iad1"],
   "functions": {
     "_render": {
       "runtime": "nodejs20.x",
+      "maxDuration": 30,
+      "memory": 1024
+    },
+    "api/**": {
+      "runtime": "python3.11",
       "maxDuration": 30,
       "memory": 1024
     }
