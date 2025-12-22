@@ -2,7 +2,7 @@
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.10+-blue.svg)
-![Node](https://img.shields.io/badge/node-18+-green.svg)
+![Node](https://img.shields.io/badge/node-24.12.0-green.svg)
 ![Status](https://img.shields.io/badge/status-active-success.svg)
 
 Sistema completo de gestión de inventario TI y mesa de ayuda con auditoría mediante Hash Chain.
@@ -49,7 +49,7 @@ gemelli-it/
 
 ### 1. Prerrequisitos
 ```bash
-Node.js >= 18
+Node.js 24.12.0
 Python >= 3.10
 pnpm >= 8
 PostgreSQL (o cuenta Supabase)
