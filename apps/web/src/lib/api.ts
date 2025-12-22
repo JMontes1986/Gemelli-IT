@@ -3,21 +3,19 @@ const getApiBaseUrl = () => {
   const resolveForHost = (origin: string, hostname: string) => {
     const sanitizedOrigin = origin.replace(/\/$/, '');
 
-    // En Netlify, el backend FastAPI se expone a través de una Netlify Function
-    // ubicada en /.netlify/functions/main. Usamos la ruta directa para evitar
-    // depender de redirecciones que pueden fallar en entornos previos.
-    if (hostname.endsWith('netlify.app') || hostname.endsWith('netlify.live')) {
-      return `${sanitizedOrigin}/.netlify/functions/main`;
+    // En Vercel, el backend FastAPI se expone mediante una función serverless
+    // bajo /api, así evitamos depender de redirecciones externas.
+    if (hostname.endsWith('vercel.app')) {
+      return `${sanitizedOrigin}/api`;
     }
     
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
       return 'http://localhost:8000';
     }
 
-    // En dominios personalizados de Netlify también necesitamos apuntar
-    // directamente a la función serverless para evitar que Netlify devuelva
-    // un HTML estático ante redirecciones fallidas.
-    return `${sanitizedOrigin}/.netlify/functions/main`;
+    // En dominios personalizados seguimos apuntando a /api para alcanzar
+    // el backend serverless desplegado en Vercel.
+    return `${sanitizedOrigin}/api`;
   };
 
   const envUrl = import.meta.env.PUBLIC_API_URL;
@@ -25,7 +23,7 @@ const getApiBaseUrl = () => {
     const sanitizedEnv = envUrl.trim().replace(/\/$/, '');
 
     // Si se configura la URL del API como el mismo origen del front
-    // (por ejemplo, en Netlify), ajustamos automáticamente la ruta
+    // (por ejemplo, en Vercel), ajustamos automáticamente la ruta
     // correcta para llegar a la función serverless o backend local.
     if (typeof window !== 'undefined') {
       const { origin, hostname } = window.location;
@@ -74,7 +72,7 @@ async function fetchAPI(endpoint: string, options: RequestInit = {}) {
 
   if (isHtmlResponse) {
     throw new Error(
-      `El backend no respondió correctamente. Verifica PUBLIC_API_URL y que la función serverless esté desplegada en /.netlify/functions/main (${API_URL}${endpoint}).`,
+      `El backend no respondió correctamente. Verifica PUBLIC_API_URL y que la función serverless esté desplegada en /api (${API_URL}${endpoint}).`,
     );
   }
   
