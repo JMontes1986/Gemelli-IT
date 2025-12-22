@@ -42,6 +42,25 @@ const getErrorMessage = (error: unknown, fallback: string) => {
   return fallback;
 };
 
+const CREATE_USER_ERROR_MESSAGES = {
+  authCreate: 'El usuario no fue creado en Auth',
+  authMissingUuid: 'Falta UUID del usuario creado en Auth',
+  profileInsert: 'El perfil no fue creado en public.users',
+} as const;
+
+const mapCreateUserErrorMessage = (errorMessage: string) => {
+  switch (errorMessage) {
+    case CREATE_USER_ERROR_MESSAGES.authCreate:
+      return 'El usuario no fue creado en Auth.';
+    case CREATE_USER_ERROR_MESSAGES.authMissingUuid:
+      return 'Falta UUID del usuario creado en Auth.';
+    case CREATE_USER_ERROR_MESSAGES.profileInsert:
+      return 'No se pudo crear el perfil en public.users.';
+    default:
+      return errorMessage;
+  }
+};
+
 const ROLE_OPTIONS = [
   { value: 'DOCENTE', label: 'Docente' },
   { value: 'ADMINISTRATIVO', label: 'Administrativo' },
@@ -172,10 +191,12 @@ const AdminUserManager: React.FC = () => {
       });
       await loadUsers();
     } catch (error: any) {
+      const baseMessage = getErrorMessage(error, 'No se pudo crear el usuario.');
+      const mappedMessage = mapCreateUserErrorMessage(baseMessage);
       runIfMounted(() =>
         setMessage({
           type: 'error',
-          text: getErrorMessage(error, 'No se pudo crear el usuario.'),
+          text: mappedMessage,
         })
       );
     } finally {
