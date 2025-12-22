@@ -34,3 +34,57 @@ const { title } = Astro.props;
     </footer>
   </div>
 </Layout>
+
+<script type="module">
+  const redirectToLogin = () => {
+    try {
+      localStorage.removeItem('access_token');
+    } catch (error) {
+      console.error('No se pudo limpiar el token local:', error);
+    }
+    window.location.href = '/login';
+  };
+
+  const resolveApiBaseUrl = () => {
+    if (typeof window === 'undefined') {
+      return 'http://localhost:8000';
+    }
+
+    const { origin, hostname } = window.location;
+    const sanitizedOrigin = origin.replace(/\/$/, '');
+
+    if (hostname.endsWith('vercel.app')) {
+      return `${sanitizedOrigin}/api`;
+    }
+
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      return 'http://localhost:8000';
+    }
+
+    return `${sanitizedOrigin}/api`;
+  };
+
+  const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+
+  if (!token) {
+    redirectToLogin();
+  } else {
+    const apiBaseUrl = resolveApiBaseUrl();
+    fetch(`${apiBaseUrl}/auth/profile`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
+      .then((response) => {
+        const contentType = response.headers.get('content-type') || '';
+        if (!response.ok || contentType.includes('text/html')) {
+          throw new Error('Sesión inválida');
+        }
+        return response;
+      })
+      .catch((error) => {
+        console.error('Sesión expirada o usuario inexistente:', error);
+        redirectToLogin();
+      });
+  }
+</script>
