@@ -1,6 +1,7 @@
 // src/components/LoginForm.tsx
 import React, { useEffect, useState } from 'react';
 import { Activity, Mail, Lock, AlertCircle, User, Building, Shield } from 'lucide-react';
+import { admin } from '../lib/api';
 import { tryGetSupabaseClient } from '../lib/supabase';
 
 const LoginForm: React.FC = () => {
@@ -84,36 +85,17 @@ const LoginForm: React.FC = () => {
           throw new Error('Las contraseñas no coinciden');
         }
 
-        const { data, error } = await supabase.auth.signUp({
+        await admin.createUser({
+          nombre: fullName,
           email,
           password,
-          options: {
-            data: {
-              full_name: fullName,
-              role,
-              org_unit_id: orgUnitId || null,
-              active: isActive,
-            },
-          },
+          rol: role,
+          org_unit_id: orgUnitId || null,
+          activo: isActive,
         });
 
-        if (error) throw error;
-
-        if (data.user) {
-          const { error: profileError } = await supabase.from('users').insert({
-            id: data.user.id,
-            nombre: fullName,
-            email,
-            rol: role,
-            org_unit_id: orgUnitId || null,
-            activo: isActive,
-          });
-
-          if (profileError) throw profileError;
-        }
-
-        setSuccess(
-          'Cuenta creada correctamente. Revisa tu correo electrónico para confirmar tu registro antes de iniciar sesión.'
+       setSuccess(
+          'Cuenta creada correctamente. Un administrador debe habilitar tu acceso para iniciar sesión.'
         );
         setMode('login');
         setPassword('');
