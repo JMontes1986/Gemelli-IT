@@ -126,6 +126,20 @@ export const auth = {
       body: JSON.stringify({ email, password }),
     });
   },
+
+  register: async (data: {
+    nombre: string;
+    email: string;
+    password: string;
+    rol: string;
+    org_unit_id?: string | null;
+    activo?: boolean;
+  }) => {
+    return fetchAPI('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
   
   getProfile: async () => {
     return fetchAPI('/auth/profile');
