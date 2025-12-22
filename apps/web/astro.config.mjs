@@ -1,27 +1,31 @@
 import { defineConfig } from 'astro/config';
-import vercel from '@astrojs/vercel/serverless';
 import react from '@astrojs/react';
 import tailwind from '@astrojs/tailwind';
+import vercel from '@astrojs/vercel/serverless';
 
-// https://astro.build/config
 export default defineConfig({
   output: 'hybrid',
-  adapter: vercel(),
+  adapter: vercel({
+    webAnalytics: { enabled: true },
+    speedInsights: { enabled: true },
+    imageService: true,
+    devImageService: 'sharp',
+    functionPerRoute: false,
+  }),
   integrations: [
     react(),
     tailwind({
       applyBaseStyles: false,
     }),
   ],
-  server: {
-    port: 4321,
-    host: true,
-  },
   vite: {
-    define: {
-      'process.env.PUBLIC_SUPABASE_URL': JSON.stringify(process.env.PUBLIC_SUPABASE_URL),
-      'process.env.PUBLIC_SUPABASE_ANON_KEY': JSON.stringify(process.env.PUBLIC_SUPABASE_ANON_KEY),
-      'process.env.PUBLIC_API_URL': JSON.stringify(process.env.PUBLIC_API_URL),
+    ssr: {
+      noExternal: ['@astrojs/react']
     },
-  },
+    build: {
+      rollupOptions: {
+        external: []
+      }
+    }
+  }
 });
