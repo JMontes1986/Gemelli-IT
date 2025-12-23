@@ -9,6 +9,7 @@ pydantic-settings==2.1.0
 
 # Base de datos y ORM
 supabase==2.3.0
+postgrest-py==0.13.1
 psycopg2-binary==2.9.9
 sqlalchemy==2.0.25
 mangum==0.17.0
@@ -24,6 +25,7 @@ openai==1.10.0
 
 # Utilidades
 python-dotenv==1.0.0
+httpx==0.26.0
 requests==2.31.0
 
 # Validación y serialización
@@ -46,6 +48,9 @@ isort==5.13.2
 
 # Logging y monitoring
 loguru==0.7.2
+
+# CORS
+python-cors==1.0.0
 
 # File handling
 python-magic==0.4.27
