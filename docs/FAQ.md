@@ -138,6 +138,15 @@ Supabase gestiona la mayoría automáticamente.
 La API valida que el rol entregado por Supabase pertenezca al conjunto soportado (`DOCENTE`, `ADMINISTRATIVO`, `TI`, `DIRECTOR`, `LIDER_TI`).
 Si llega cualquier otro valor (por ejemplo, `guest`), el endpoint devolverá un **HTTP 422** con el detalle `"Rol en Supabase inválido: <valor>"` para que soporte corrija el perfil en Supabase antes de reintentar.
 
+### ¿Cómo creo usuarios fuera de la aplicación?
+
+Si necesitas crear usuarios manualmente (por ejemplo, desde Supabase o scripts), sigue este orden:
+1. Crea el usuario primero en **Auth > Users** dentro de Supabase.
+2. Copia el UUID generado (`auth.users.id`).
+3. Inserta el perfil en `public.users` usando ese UUID como `id`, y completa los campos obligatorios (`nombre`, `email`, `rol`, `activo`). `org_unit_id` es opcional.
+
+Esto evita el error de llave foránea y garantiza que `/auth/profile` devuelva el perfil correctamente.
+
 ### ¿Los tickets son privados?
 
 **Sí**. RLS garantiza que:
