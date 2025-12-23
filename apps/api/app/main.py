@@ -41,6 +41,10 @@ ALLOWED_ROLES = {"DOCENTE", "ADMINISTRATIVO", "TI", "DIRECTOR", "LIDER_TI"}
 AUTH_CREATE_ERROR_MESSAGE = "El usuario no fue creado en Auth"
 AUTH_UUID_MISSING_MESSAGE = "Falta UUID del usuario creado en Auth"
 PUBLIC_USERS_INSERT_ERROR_MESSAGE = "El perfil no fue creado en public.users"
+PROFILE_AUTO_CREATE_FAILED_MESSAGE = (
+    "No se pudo crear el perfil del usuario en public.users. "
+    "Verifica que exista el UUID de Auth y los metadatos requeridos."
+)
 
 
 def _configure_logging() -> logging.Logger:
@@ -593,6 +597,97 @@ def ensure_allowed_role(raw_role: Optional[str]) -> str:
     return normalized_role
 
 
+def build_user_profile_from_record(record: Dict[str, Any]) -> UserProfile:
+    raw_role = record.get("rol")
+    normalized_role = ensure_allowed_role(raw_role)
+
+    org_unit_info = record.get("org_units") or {}
+    org_unit_nombre: Optional[str] = None
+
+    if isinstance(org_unit_info, dict):
+        org_unit_nombre = org_unit_info.get("nombre")
+
+    return UserProfile(
+        id=record["id"],
+        nombre=record["nombre"],
+        email=record["email"],
+        rol=normalized_role,
+        org_unit_id=record.get("org_unit_id"),
+        org_unit_nombre=org_unit_nombre,
+    )
+
+
+def ensure_profile_for_auth_user(auth_user: Any) -> UserProfile:
+    metadata = getattr(auth_user, "user_metadata", None) or {}
+    raw_role = metadata.get("role") or metadata.get("rol")
+    if raw_role:
+        normalized_role = ensure_allowed_role(raw_role)
+    else:
+        logger.warning(
+            "Auth user %s no tiene rol definido; se asigna DOCENTE por defecto.",
+            getattr(auth_user, "id", "unknown"),
+        )
+        normalized_role = "DOCENTE"
+
+    email = normalize_email_value(getattr(auth_user, "email", None))
+    if not email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=PROFILE_AUTO_CREATE_FAILED_MESSAGE,
+        )
+
+    nombre = metadata.get("full_name") or metadata.get("nombre")
+    if not nombre:
+        nombre = email.split("@")[0] if "@" in email else "Usuario"
+    nombre = str(nombre).strip() or "Usuario"
+
+    org_unit_id = metadata.get("org_unit_id")
+    activo = metadata.get("active")
+    if activo is None:
+        activo = True
+
+    profile_payload = {
+        "id": getattr(auth_user, "id", None),
+        "nombre": nombre,
+        "email": email,
+        "rol": normalized_role,
+        "org_unit_id": org_unit_id,
+        "activo": activo,
+    }
+
+    if not profile_payload["id"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=PROFILE_AUTO_CREATE_FAILED_MESSAGE,
+        )
+
+    try:
+        response = supabase.table("users").insert(profile_payload).execute()
+    except Exception:
+        logger.exception("Error inesperado al crear perfil automático en public.users")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=PROFILE_AUTO_CREATE_FAILED_MESSAGE,
+        )
+
+    handle_supabase_error(
+        response,
+        PROFILE_AUTO_CREATE_FAILED_MESSAGE,
+    )
+
+    record = fetch_user_profile_by_id(profile_payload["id"])
+    return build_user_profile_from_record(
+        {
+            "id": record.get("id"),
+            "nombre": record.get("nombre"),
+            "email": record.get("email"),
+            "rol": record.get("rol"),
+            "org_unit_id": record.get("org_unit_id"),
+            "org_units": {"nombre": record.get("org_unit_nombre")},
+        }
+    )
+
+
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> UserProfile:
     """Obtener usuario autenticado desde JWT"""
     try:
@@ -607,41 +702,25 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
             supabase.table("users")
             .select("id, nombre, email, rol, org_unit_id, org_units(nombre)")
             .eq("id", user_response.user.id)
-            .single()
+            .limit(1)
             .execute()
         )
 
         data = handle_supabase_error(
             user_data_response,
             "No se pudo obtener el perfil del usuario",
-            require_data=True,
+            require_data=False,
         )
 
-        if not isinstance(data, dict) or not data.get("id"):
+        if not data:
+            return ensure_profile_for_auth_user(user_response.user)
+
+        record = data[0] if isinstance(data, list) else data
+        if not isinstance(record, dict) or not record.get("id"):
             raise HTTPException(status_code=401, detail="Usuario eliminado o no encontrado")
 
-        raw_role = data.get("rol")
-        normalized_role = ensure_allowed_role(raw_role)
-
-        org_unit_info = data.get("org_units") or {}
-        org_unit_nombre: Optional[str] = None
-
-        if isinstance(org_unit_info, dict):
-            org_unit_nombre = org_unit_info.get("nombre")
-            
-        return UserProfile(
-            id=data["id"],
-            nombre=data["nombre"],
-            email=data["email"],
-            rol=normalized_role,
-            org_unit_id=data.get("org_unit_id"),
-            org_unit_nombre=org_unit_nombre,
-        )
+        return build_user_profile_from_record(record)
     except HTTPException:
-        try:
-            supabase.auth.admin.delete_user(new_user_id)
-        except Exception:
-            pass
         raise
     except Exception as e:
         raise HTTPException(status_code=401, detail=f"Error de autenticación: {str(e)}")
