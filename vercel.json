@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "npm run build",
+  "buildCommand": "pnpm build && rm -rf .vercel/output && cp -R apps/web/.vercel/output .vercel/output",
   "framework": null,
   "regions": ["iad1"],
   "functions": {
