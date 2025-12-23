@@ -5,7 +5,10 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from supabase import create_client, Client
 from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List, Literal, Dict, Any
-from datetime import datetime
+from datetime import datetime, timedelta
+from jose import JWTError, jwt
+from passlib.context import CryptContext
+from uuid import uuid4
 import os
 import hashlib
 import logging
@@ -35,16 +38,13 @@ SUPABASE_KEY_ENV_KEYS = (
 JWT_SECRET = os.getenv("JWT_SECRET")
 AUDIT_SECRET = os.getenv("AUDIT_SECRET", "change-this-secret-key-in-production")
 ROOT_PATH = os.getenv("ROOT_PATH", "")
+JWT_ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
+PASSWORD_CONTEXT = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 EMAIL_REGEX = re.compile(r"^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$", re.IGNORECASE)
 ALLOWED_ROLES = {"DOCENTE", "ADMINISTRATIVO", "TI", "DIRECTOR", "LIDER_TI"}
-AUTH_CREATE_ERROR_MESSAGE = "El usuario no fue creado en Auth"
-AUTH_UUID_MISSING_MESSAGE = "Falta UUID del usuario creado en Auth"
 PUBLIC_USERS_INSERT_ERROR_MESSAGE = "El perfil no fue creado en public.users"
-PROFILE_AUTO_CREATE_FAILED_MESSAGE = (
-    "No se pudo crear el perfil del usuario en public.users. "
-    "Verifica que exista el UUID de Auth y los metadatos requeridos."
-)
 
 
 def _configure_logging() -> logging.Logger:
@@ -341,6 +341,46 @@ class AdminUserUpdate(BaseModel):
             raise ValueError("El nombre debe tener al menos 2 caracteres")
         return cleaned
 
+
+class LoginRequest(BaseModel):
+    email: str = Field(..., max_length=255)
+    password: str = Field(..., min_length=8, max_length=128)
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, value: str) -> str:
+        normalized = (value or "").strip().lower()
+        if not normalized or not EMAIL_REGEX.match(normalized):
+            raise ValueError("Correo electrónico inválido")
+        return normalized
+
+
+class LoginResponse(BaseModel):
+    access_token: str
+    token_type: Literal["bearer"] = "bearer"
+    user: UserProfile
+
+
+def get_password_hash(password: str) -> str:
+    return PASSWORD_CONTEXT.hash(password)
+
+
+def verify_password(plain_password: str, password_hash: str) -> bool:
+    return PASSWORD_CONTEXT.verify(plain_password, password_hash)
+
+
+def require_jwt_secret() -> str:
+    if not JWT_SECRET:
+        logger.error("JWT_SECRET no está configurado")
+        raise HTTPException(status_code=503, detail="JWT_SECRET no está configurado")
+    return JWT_SECRET
+
+
+def create_access_token(subject: str, expires_delta: Optional[timedelta] = None) -> str:
+    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+    to_encode = {"sub": subject, "exp": expire}
+    return jwt.encode(to_encode, require_jwt_secret(), algorithm=JWT_ALGORITHM)
+    
 def create_user_with_profile(payload: AdminUserCreate) -> Dict[str, Any]:
     normalized_email = normalize_email_value(payload.email)
     if not normalized_email or not EMAIL_REGEX.match(normalized_email):
@@ -364,32 +404,8 @@ def create_user_with_profile(payload: AdminUserCreate) -> Dict[str, Any]:
     if existing.data:
         raise HTTPException(status_code=409, detail="El correo electrónico ya está registrado")
 
-    try:
-        auth_response = supabase.auth.admin.create_user({
-            "email": normalized_email,
-            "password": payload.password,
-            "email_confirm": True,
-            "user_metadata": {
-                "full_name": payload.nombre,
-                "role": normalized_role,
-                "org_unit_id": payload.org_unit_id,
-                "active": payload.activo,
-            },
-        })
-    except Exception:
-        logger.exception("No se pudo crear el usuario en Supabase Auth")
-        raise HTTPException(status_code=400, detail=AUTH_CREATE_ERROR_MESSAGE)
-
-    auth_error = getattr(auth_response, "error", None)
-    if auth_error:
-        message = extract_supabase_error_message(auth_error, "Error desconocido en Auth")
-        logger.error("Supabase Auth devolvió error al crear usuario: %s", message)
-        raise HTTPException(status_code=400, detail=AUTH_CREATE_ERROR_MESSAGE)
-
-    new_user = getattr(auth_response, "user", None)
-    new_user_id = getattr(new_user, "id", None) if new_user else None
-    if not new_user_id:
-        raise HTTPException(status_code=400, detail=AUTH_UUID_MISSING_MESSAGE)
+    new_user_id = str(uuid4())
+    password_hash = get_password_hash(payload.password)
 
     profile_payload = {
         "id": new_user_id,
@@ -398,6 +414,7 @@ def create_user_with_profile(payload: AdminUserCreate) -> Dict[str, Any]:
         "rol": normalized_role,
         "org_unit_id": payload.org_unit_id,
         "activo": payload.activo,
+        "password_hash": password_hash,
     }
 
     try:
@@ -424,11 +441,7 @@ def create_user_with_profile(payload: AdminUserCreate) -> Dict[str, Any]:
         raise
     except Exception:
         logger.exception("Error inesperado al crear perfil en public.users")
-        try:
-            supabase.auth.admin.delete_user(new_user_id)
-        except Exception:
-            pass
-        raise HTTPException(
+       raise HTTPException(
             status_code=400,
             detail=PUBLIC_USERS_INSERT_ERROR_MESSAGE,
         )
@@ -592,7 +605,7 @@ def ensure_allowed_role(raw_role: Optional[str]) -> str:
     if normalized_role not in ALLOWED_ROLES:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Rol en Supabase inválido: {raw_role}",
+            detail=f"Rol inválido: {raw_role}",
         )
     return normalized_role
 
@@ -617,91 +630,19 @@ def build_user_profile_from_record(record: Dict[str, Any]) -> UserProfile:
     )
 
 
-def ensure_profile_for_auth_user(auth_user: Any) -> UserProfile:
-    metadata = getattr(auth_user, "user_metadata", None) or {}
-    raw_role = metadata.get("role") or metadata.get("rol")
-    if raw_role:
-        normalized_role = ensure_allowed_role(raw_role)
-    else:
-        logger.warning(
-            "Auth user %s no tiene rol definido; se asigna DOCENTE por defecto.",
-            getattr(auth_user, "id", "unknown"),
-        )
-        normalized_role = "DOCENTE"
-
-    email = normalize_email_value(getattr(auth_user, "email", None))
-    if not email:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=PROFILE_AUTO_CREATE_FAILED_MESSAGE,
-        )
-
-    nombre = metadata.get("full_name") or metadata.get("nombre")
-    if not nombre:
-        nombre = email.split("@")[0] if "@" in email else "Usuario"
-    nombre = str(nombre).strip() or "Usuario"
-
-    org_unit_id = metadata.get("org_unit_id")
-    activo = metadata.get("active")
-    if activo is None:
-        activo = True
-
-    profile_payload = {
-        "id": getattr(auth_user, "id", None),
-        "nombre": nombre,
-        "email": email,
-        "rol": normalized_role,
-        "org_unit_id": org_unit_id,
-        "activo": activo,
-    }
-
-    if not profile_payload["id"]:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=PROFILE_AUTO_CREATE_FAILED_MESSAGE,
-        )
-
-    try:
-        response = supabase.table("users").insert(profile_payload).execute()
-    except Exception:
-        logger.exception("Error inesperado al crear perfil automático en public.users")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=PROFILE_AUTO_CREATE_FAILED_MESSAGE,
-        )
-
-    handle_supabase_error(
-        response,
-        PROFILE_AUTO_CREATE_FAILED_MESSAGE,
-    )
-
-    record = fetch_user_profile_by_id(profile_payload["id"])
-    return build_user_profile_from_record(
-        {
-            "id": record.get("id"),
-            "nombre": record.get("nombre"),
-            "email": record.get("email"),
-            "rol": record.get("rol"),
-            "org_unit_id": record.get("org_unit_id"),
-            "org_units": {"nombre": record.get("org_unit_nombre")},
-        }
-    )
-
-
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> UserProfile:
     """Obtener usuario autenticado desde JWT"""
     try:
         token = credentials.credentials
-        user_response = supabase.auth.get_user(token)
-        
-        if not user_response.user:
-            raise HTTPException(status_code=401, detail="Usuario no autenticado")
-        
-        # Obtener datos completos del usuario
+       payload = jwt.decode(token, require_jwt_secret(), algorithms=[JWT_ALGORITHM])
+        user_id = payload.get("sub")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Token inválido")
+            
         user_data_response = (
             supabase.table("users")
-            .select("id, nombre, email, rol, org_unit_id, org_units(nombre)")
-            .eq("id", user_response.user.id)
+            .select("id, nombre, email, rol, org_unit_id, org_units(nombre), activo")
+            .eq("id", user_id)
             .limit(1)
             .execute()
         )
@@ -713,13 +654,18 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         )
 
         if not data:
-            return ensure_profile_for_auth_user(user_response.user)
+            raise HTTPException(status_code=401, detail="Usuario eliminado o no encontrado")
 
         record = data[0] if isinstance(data, list) else data
         if not isinstance(record, dict) or not record.get("id"):
             raise HTTPException(status_code=401, detail="Usuario eliminado o no encontrado")
 
+         if record.get("activo") is False:
+            raise HTTPException(status_code=403, detail="Usuario inactivo")
+             
         return build_user_profile_from_record(record)
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Token inválido o expirado")
     except HTTPException:
         raise
     except Exception as e:
@@ -786,6 +732,30 @@ def fetch_user_profile_by_id(user_id: str) -> Dict[str, Any]:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
     return serialize_user_record(response.data[0])
+
+
+def fetch_user_record_by_email(email: str) -> Dict[str, Any]:
+    try:
+        response = (
+            supabase.table("users")
+            .select("id, nombre, email, rol, activo, org_unit_id, org_units(nombre), password_hash")
+            .eq("email", email)
+            .limit(1)
+            .execute()
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"No se pudo obtener el usuario: {exc}")
+
+    if not response.data:
+        raise HTTPException(status_code=401, detail="Credenciales inválidas")
+
+    record = response.data[0]
+    if not record.get("password_hash"):
+        raise HTTPException(status_code=401, detail="Credenciales inválidas")
+
+    return record
 
 
 def get_inventory_permission_by_email(email: Optional[str]) -> Optional[dict]:
@@ -911,6 +881,26 @@ async def get_profile(user: UserProfile = Depends(get_current_user)):
     return user
 
 
+@app.post("/auth/login", response_model=LoginResponse)
+async def login(payload: LoginRequest):
+    """Iniciar sesión con correo y contraseña."""
+    normalized_email = normalize_email_value(payload.email)
+    if not normalized_email:
+        raise HTTPException(status_code=422, detail="Correo electrónico inválido")
+
+    record = fetch_user_record_by_email(normalized_email)
+
+    if not verify_password(payload.password, record["password_hash"]):
+        raise HTTPException(status_code=401, detail="Credenciales inválidas")
+
+    if record.get("activo") is False:
+        raise HTTPException(status_code=403, detail="Usuario inactivo")
+
+    user_profile = build_user_profile_from_record(record)
+    token = create_access_token(user_profile.id)
+    return LoginResponse(access_token=token, user=user_profile)
+
+
 @app.post("/auth/register", status_code=201)
 async def register_user(payload: AdminUserCreate):
     """Registro público de usuarios con perfil inicial."""
@@ -976,34 +966,30 @@ async def admin_update_user(
     user: UserProfile = Depends(require_global_admin()),
 ):
     updates: Dict[str, Any] = {}
-    metadata_updates: Dict[str, Any] = {}
     audit_metadata: Dict[str, Any] = {}
 
     if payload.nombre is not None:
         updates["nombre"] = payload.nombre
-        metadata_updates["full_name"] = payload.nombre
         audit_metadata["nombre"] = payload.nombre
 
     if payload.rol is not None:
         normalized_role = ensure_allowed_role(payload.rol)
         updates["rol"] = normalized_role
-        metadata_updates["role"] = normalized_role
         audit_metadata["rol"] = normalized_role
 
     if payload.org_unit_id is not None:
         updates["org_unit_id"] = payload.org_unit_id
-        metadata_updates["org_unit_id"] = payload.org_unit_id
         audit_metadata["org_unit_id"] = payload.org_unit_id
 
     if payload.activo is not None:
         updates["activo"] = payload.activo
-        metadata_updates["active"] = payload.activo
         audit_metadata["activo"] = payload.activo
 
     if payload.password:
+        updates["password_hash"] = get_password_hash(payload.password)
         audit_metadata["password_reset"] = True
 
-    if not updates and not payload.password:
+    if not updates:
         raise HTTPException(status_code=400, detail="No se proporcionaron cambios para actualizar")
 
     try:
@@ -1018,13 +1004,6 @@ async def admin_update_user(
             if not response.data:
                 raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
-        if metadata_updates or payload.password:
-            update_payload: Dict[str, Any] = {}
-            if metadata_updates:
-                update_payload["user_metadata"] = metadata_updates
-            if payload.password:
-                update_payload["password"] = payload.password
-            supabase.auth.admin.update_user_by_id(user_id, update_payload)
     except HTTPException:
         raise
     except Exception as exc:
