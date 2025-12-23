@@ -34,6 +34,18 @@ const LoginForm: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    try {
+      const profileError = localStorage.getItem('auth_profile_error');
+      if (profileError) {
+        setError(profileError);
+        localStorage.removeItem('auth_profile_error');
+      }
+    } catch (storageError) {
+      console.error('No se pudo leer el error de perfil:', storageError);
+    }
+  }, []);
+  
+  useEffect(() => {
     if (!supabase) {
       return;
     }
