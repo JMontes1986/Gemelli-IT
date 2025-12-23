@@ -75,10 +75,21 @@ const { title } = Astro.props;
         Authorization: `Bearer ${token}`,
       },
     })
-      .then((response) => {
+      .then(async (response) => {
         const contentType = response.headers.get('content-type') || '';
-        if (!response.ok || contentType.includes('text/html')) {
-          throw new Error('Sesión inválida');
+        const isHtml = contentType.includes('text/html');
+        if (!response.ok || isHtml) {
+          let detail = 'Sesión inválida';
+          if (!isHtml) {
+            try {
+              const body = await response.clone().json();
+              detail = body?.detail || body?.message || detail;
+            } catch (parseError) {
+              console.error('No se pudo interpretar el error de perfil:', parseError);
+            }
+          }
+          localStorage.setItem('auth_profile_error', detail);
+          throw new Error(detail);
         }
         return response;
       })
