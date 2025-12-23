@@ -26,16 +26,24 @@ CREATE TABLE org_units (
 );
 
 -- Usuarios
-CREATE TABLE users (
-    id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+CREATE TABLE IF NOT EXISTS users (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     nombre VARCHAR(200) NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
     rol user_role NOT NULL DEFAULT 'DOCENTE',
     org_unit_id UUID REFERENCES org_units(id) ON DELETE SET NULL,
     activo BOOLEAN DEFAULT TRUE,
     creado_en TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     actualizado_en TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+ALTER TABLE users
+    DROP CONSTRAINT IF EXISTS users_id_fkey;
+ALTER TABLE users
+    ALTER COLUMN id SET DEFAULT uuid_generate_v4();
+ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS password_hash TEXT;
 
 -- Permisos delegados para inventario
 CREATE TABLE inventory_access_grants (
