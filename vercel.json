@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "pnpm build && rm -rf .vercel/output && cp -R apps/web/.vercel/output .vercel/output",
+  "buildCommand": "pnpm build && if [ -d apps/web/.vercel/output ]; then rm -rf .vercel/output && cp -R apps/web/.vercel/output .vercel/output; fi",
   "framework": null,
   "regions": ["iad1"],
   "functions": {
