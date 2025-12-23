@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, CheckCircle } from 'lucide-react';
+import { auth } from '@/lib/api';
 
 interface RegisterFormData {
   nombre: string;
@@ -60,26 +61,14 @@ export default function RegisterDialog() {
     setIsLoading(true);
 
     try {
-      const response = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          nombre: formData.nombre,
-          email: formData.email,
-          password: formData.password,
-          role: formData.role,
-          org_unit_id: formData.org_unit_id,
-          is_active: formData.is_active,
-        }),
+      await auth.register({
+        nombre: formData.nombre,
+        email: formData.email,
+        password: formData.password,
+        rol: formData.role,
+        org_unit_id: formData.org_unit_id,
+        activo: formData.is_active,
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Error al crear usuario');
-      }
 
       setSuccess('Usuario creado exitosamente');
       
