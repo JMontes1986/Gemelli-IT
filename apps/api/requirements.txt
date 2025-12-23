@@ -50,7 +50,6 @@ isort==5.13.2
 loguru==0.7.2
 
 # CORS
-python-cors==1.0.0
 
 # File handling
 python-magic==0.4.27
