@@ -1,0 +1,18 @@
+---
+// src/pages/backups/index.astro
+import MainLayout from '../../layouts/MainLayout.astro';
+import BackupList from '../../components/BackupList';
+---
+
+<MainLayout title="Backups">
+  <div class="max-w-6xl mx-auto px-4 py-8 space-y-6">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900">Backups & Resguardo</h1>
+      <p class="text-gray-600">
+        Consulta los respaldos registrados para los dispositivos del colegio.
+      </p>
+    </div>
+
+    <BackupList client:load />
+  </div>
+</MainLayout>
