@@ -26,9 +26,9 @@ interface RegisterFormData {
   email: string;
   password: string;
   confirmPassword: string;
-  role: string;
+  rol: string;
   org_unit_id: number;
-  is_active: boolean;
+  activo: boolean;
 }
 
 export default function RegisterDialog() {
@@ -37,9 +37,9 @@ export default function RegisterDialog() {
     email: '',
     password: '',
     confirmPassword: '',
-    role: 'DOCENTE',
+    rol: 'DOCENTE',
     org_unit_id: 1,
-    is_active: true,
+    activo: true,
   });
 
   const [error, setError] = useState<string>('');
@@ -65,9 +65,9 @@ export default function RegisterDialog() {
         nombre: formData.nombre,
         email: formData.email,
         password: formData.password,
-        rol: formData.role,
+        rol: formData.rol,
         org_unit_id: formData.org_unit_id,
-        activo: formData.is_active,
+        activo: formData.activo,
       });
 
       setSuccess('Usuario creado exitosamente');
@@ -78,9 +78,9 @@ export default function RegisterDialog() {
         email: '',
         password: '',
         confirmPassword: '',
-        role: 'DOCENTE',
+        rol: 'DOCENTE',
         org_unit_id: 1,
-        is_active: true,
+        activo: true,
       });
 
       // Cerrar dialog después de 2 segundos
@@ -199,8 +199,8 @@ export default function RegisterDialog() {
           <div className="space-y-2">
             <Label htmlFor="role">Rol</Label>
             <Select
-              value={formData.role}
-              onValueChange={(value) => handleChange('role', value)}
+              value={formData.rol}
+              onValueChange={(value) => handleChange('rol', value)}
               disabled={isLoading}
             >
               <SelectTrigger id="role">
@@ -239,13 +239,13 @@ export default function RegisterDialog() {
           <div className="flex items-center space-x-2">
             <input
               type="checkbox"
-              id="is_active"
-              checked={formData.is_active}
-              onChange={(e) => handleChange('is_active', e.target.checked)}
+              id="activo"
+              checked={formData.activo}
+              onChange={(e) => handleChange('activo', e.target.checked)}
               disabled={isLoading}
               className="h-4 w-4 rounded border-gray-300"
             />
-            <Label htmlFor="is_active" className="cursor-pointer">
+            <Label htmlFor="activo" className="cursor-pointer">
               Usuario activo
             </Label>
           </div>
