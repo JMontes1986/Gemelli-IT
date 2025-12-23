@@ -18,6 +18,9 @@ class DummyTable:
     def eq(self, *_args, **_kwargs):
         return self
 
+    def limit(self, *_args, **_kwargs):
+        return self
+        
     def single(self):
         return self
 
@@ -28,7 +31,7 @@ class DummyTable:
 class DummySupabase:
     def __init__(self, user_id: str, user_data: dict):
         self._user_data = user_data
-        self.auth = SimpleNamespace(get_user=lambda _token: SimpleNamespace(user=SimpleNamespace(id=user_id)))
+        self._user_id = user_id
 
     def table(self, name: str):
         assert name == "users"
@@ -44,6 +47,7 @@ def setup_supabase(monkeypatch, user_data):
 
 
 def test_get_current_user_normalizes_role(monkeypatch):
+    monkeypatch.setattr(main, "JWT_SECRET", "test-secret")
     user_data = {
         "id": "user-123",
         "nombre": "Test User",
@@ -51,9 +55,11 @@ def test_get_current_user_normalizes_role(monkeypatch):
         "rol": "director",
         "org_unit_id": "org-1",
         "org_units": {"nombre": "Org Uno"},
+        "activo": True,
     }
     setup_supabase(monkeypatch, user_data)
-    credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="token")
+    token = main.create_access_token(user_data["id"])
+    credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials=token)
 
     user = asyncio.run(main.get_current_user(credentials))
 
@@ -61,6 +67,7 @@ def test_get_current_user_normalizes_role(monkeypatch):
 
 
 def test_get_current_user_invalid_role(monkeypatch):
+    monkeypatch.setattr(main, "JWT_SECRET", "test-secret")
     user_data = {
         "id": "user-456",
         "nombre": "Test User",
@@ -68,12 +75,14 @@ def test_get_current_user_invalid_role(monkeypatch):
         "rol": "guest",
         "org_unit_id": "org-1",
         "org_units": {"nombre": "Org Uno"},
+        "activo": True,
     }
     setup_supabase(monkeypatch, user_data)
-    credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="token")
+    token = main.create_access_token(user_data["id"])
+    credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials=token)
 
     with pytest.raises(HTTPException) as exc:
         asyncio.run(main.get_current_user(credentials))
 
     assert exc.value.status_code == 422
-    assert "Rol en Supabase inválido" in exc.value.detail
+    assert "Rol inválido" in exc.value.detail
