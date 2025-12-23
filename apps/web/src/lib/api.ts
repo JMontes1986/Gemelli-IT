@@ -132,7 +132,7 @@ export const auth = {
     email: string;
     password: string;
     rol: string;
-    org_unit_id?: string | null;
+    org_unit_id?: number | string | null;
     activo?: boolean;
   }) => {
     return fetchAPI('/auth/register', {
