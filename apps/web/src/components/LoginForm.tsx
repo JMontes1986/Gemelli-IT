@@ -20,6 +20,8 @@ const LoginForm: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [resendLoading, setResendLoading] = useState(false);
+  const [emailNotConfirmed, setEmailNotConfirmed] = useState(false);
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [supabase, setSupabase] = useState<ReturnType<typeof tryGetSupabaseClient>>();
 
@@ -36,6 +38,28 @@ const LoginForm: React.FC = () => {
     setSupabase(client);
   }, []);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const errorDescription = new URLSearchParams(window.location.hash.replace(/^#/, '')).get(
+      'error_description',
+    );
+    if (!errorDescription) {
+      return;
+    }
+
+    const decodedError = decodeURIComponent(errorDescription.replace(/\+/g, ' '));
+    const normalizedError = decodedError.toLowerCase();
+
+    if (normalizedError.includes('expired') || normalizedError.includes('invalid')) {
+      setError('El enlace de confirmación expiró o ya fue usado. Solicita uno nuevo para activar tu cuenta.');
+    } else {
+      setError(decodedError);
+    }
+  }, []);
+  
   useEffect(() => {
     try {
       const profileError = localStorage.getItem('auth_profile_error');
@@ -76,6 +100,7 @@ const LoginForm: React.FC = () => {
     e.preventDefault();
     setError('');
     setSuccess('');
+    setEmailNotConfirmed(false);
     setLoading(true);
 
     try {
@@ -125,8 +150,12 @@ const LoginForm: React.FC = () => {
     } catch (err: any) {
       const fallbackMessage = isLogin ? 'Error al iniciar sesión' : 'Error al crear la cuenta';
       const rawErrorMessage = err?.message || fallbackMessage;
-
-      if (isLogin && rawErrorMessage.toLowerCase().includes('invalid login credentials')) {
+      const normalizedError = rawErrorMessage.toLowerCase();
+      
+       if (isLogin && normalizedError.includes('email not confirmed')) {
+        setEmailNotConfirmed(true);
+        setError('Tu correo aún no está confirmado. Reenvía el correo de confirmación y usa el enlace más reciente.');
+      } else if (isLogin && normalizedError.includes('invalid login credentials')) {
         setError('Credenciales inválidas. Verifica correo/contraseña o usa "Registrarme" para crear tu cuenta.');
       } else {
         setError(rawErrorMessage);
@@ -136,6 +165,42 @@ const LoginForm: React.FC = () => {
     }
   };
 
+  const handleResendConfirmation = async () => {
+    if (!supabase) {
+      setError('Supabase no está configurado.');
+      return;
+    }
+
+    if (!email.trim()) {
+      setError('Ingresa tu correo para reenviar la confirmación.');
+      return;
+    }
+
+    setResendLoading(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const normalizedEmail = email.trim().toLowerCase();
+      const emailRedirectTo = `${window.location.origin.replace(/\/$/, '')}/login`;
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: normalizedEmail,
+        options: { emailRedirectTo },
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      setSuccess('Te enviamos un nuevo correo de confirmación. Revisa tu bandeja principal y spam.');
+    } catch (err: any) {
+      setError(err?.message || 'No se pudo reenviar el correo de confirmación.');
+    } finally {
+      setResendLoading(false);
+    }
+  };
+  
   return (
     <div className="w-full max-w-md">
       {/* Logo y Título */}
@@ -175,7 +240,19 @@ const LoginForm: React.FC = () => {
         {error && (
           <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
             <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-            <p className="text-sm text-red-700">{error}</p>
+            <div className="flex-1">
+              <p className="text-sm text-red-700">{error}</p>
+              {isLogin && emailNotConfirmed && (
+                <button
+                  type="button"
+                  onClick={handleResendConfirmation}
+                  disabled={resendLoading}
+                  className="mt-2 text-sm font-medium text-blue-700 hover:text-blue-800 disabled:opacity-70"
+                >
+                  {resendLoading ? 'Reenviando...' : 'Reenviar correo de confirmación'}
+                </button>
+              )}
+            </div>
           </div>
         )}
 
