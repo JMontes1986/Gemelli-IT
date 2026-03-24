@@ -110,7 +110,9 @@ const LoginForm: React.FC = () => {
         });
 
        setSuccess(
-          'Cuenta creada correctamente. Un administrador debe habilitar tu acceso para iniciar sesión.'
+          isActive
+            ? 'Cuenta creada correctamente. Ya puedes iniciar sesión.'
+            : 'Cuenta creada correctamente. Un administrador debe habilitar tu acceso para iniciar sesión.'
         );
         setMode('login');
         setPassword('');
