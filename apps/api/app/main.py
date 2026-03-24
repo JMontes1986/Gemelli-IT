@@ -176,7 +176,7 @@ app = FastAPI(
 # CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:4321", "https://*.vercel.app"],
+    allow_origins=["http://localhost:4321", "https://adminti.vercel.app", "https://gemelli-it.vercel.app"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -441,7 +441,7 @@ def create_user_with_profile(payload: AdminUserCreate) -> Dict[str, Any]:
         raise
     except Exception:
         logger.exception("Error inesperado al crear perfil en public.users")
-       raise HTTPException(
+        raise HTTPException(
             status_code=400,
             detail=PUBLIC_USERS_INSERT_ERROR_MESSAGE,
         )
@@ -634,7 +634,7 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     """Obtener usuario autenticado desde JWT"""
     try:
         token = credentials.credentials
-       payload = jwt.decode(token, require_jwt_secret(), algorithms=[JWT_ALGORITHM])
+        payload = jwt.decode(token, require_jwt_secret(), algorithms=[JWT_ALGORITHM])
         user_id = payload.get("sub")
         if not user_id:
             raise HTTPException(status_code=401, detail="Token inválido")
@@ -660,7 +660,7 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         if not isinstance(record, dict) or not record.get("id"):
             raise HTTPException(status_code=401, detail="Usuario eliminado o no encontrado")
 
-         if record.get("activo") is False:
+        if record.get("activo") is False:
             raise HTTPException(status_code=403, detail="Usuario inactivo")
              
         return build_user_profile_from_record(record)
@@ -1568,4 +1568,3 @@ else:  # pragma: no cover - exposes app for ASGI servers
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
-    
