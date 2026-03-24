@@ -109,17 +109,10 @@ const LoginForm: React.FC = () => {
       }
       
       if (mode === 'login') {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-
-        if (error) throw error;
-
-        if (data.session) {
-          localStorage.setItem('access_token', data.session.access_token);
-          window.location.href = '/dashboard';
-        }
+        const normalizedEmail = email.trim().toLowerCase();
+        const response = await auth.login(normalizedEmail, password);
+        localStorage.setItem('access_token', response.access_token);
+        window.location.href = '/dashboard';
       } else {
         if (password !== confirmPassword) {
           throw new Error('Las contraseñas no coinciden');
