@@ -84,6 +84,76 @@ const buildFallbackUrls = (endpoint: string) => {
   return Array.from(new Set(urls));
 };
 
+const isApiNotReachableError = (message: string) => {
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes('not_found') ||
+    normalized.includes('not found') ||
+    normalized.includes('failed to fetch') ||
+    normalized.includes('backend no respondió correctamente')
+  );
+};
+
+async function registerUserViaSupabase(data: {
+  nombre: string;
+  email: string;
+  password: string;
+  rol: string;
+  org_unit_id?: number | string | null;
+  activo?: boolean;
+}) {
+  if (typeof window === 'undefined') {
+    throw new Error('No se pudo registrar el usuario en este entorno.');
+  }
+
+  const { getSupabaseClient } = await import('./supabase');
+  const supabase = getSupabaseClient();
+  const normalizedEmail = data.email.trim().toLowerCase();
+
+  const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+    email: normalizedEmail,
+    password: data.password,
+    options: {
+      data: {
+        nombre: data.nombre,
+        rol: data.rol,
+      },
+    },
+  });
+
+  if (signUpError) {
+    throw new Error(signUpError.message || 'No se pudo crear el usuario en Supabase Auth.');
+  }
+
+  const userId = signUpData.user?.id;
+  if (!userId) {
+    throw new Error('No se recibió el UUID del usuario creado en Supabase Auth.');
+  }
+
+  const { error: profileError } = await supabase.from('users').upsert(
+    {
+      id: userId,
+      nombre: data.nombre,
+      email: normalizedEmail,
+      rol: data.rol,
+      org_unit_id: data.org_unit_id || null,
+      activo: data.activo ?? true,
+      // Esta columna se mantiene por compatibilidad con el esquema actual.
+      password_hash: 'managed_by_supabase_auth',
+    },
+    { onConflict: 'id' },
+  );
+
+  if (profileError) {
+    throw new Error(
+      profileError.message ||
+        'No se pudo crear el perfil en public.users. Revisa las políticas RLS de INSERT.',
+    );
+  }
+
+  return signUpData;
+}
+
 // Helper para hacer requests autenticados
 async function fetchAPI(endpoint: string, options: RequestInit = {}) {
   const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
@@ -171,10 +241,19 @@ export const auth = {
     org_unit_id?: number | string | null;
     activo?: boolean;
   }) => {
-    return fetchAPI('/auth/register', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
+    try {
+      return await fetchAPI('/auth/register', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!isApiNotReachableError(message)) {
+        throw error;
+      }
+
+      return registerUserViaSupabase(data);
+    }
   },
   
   getProfile: async () => {
