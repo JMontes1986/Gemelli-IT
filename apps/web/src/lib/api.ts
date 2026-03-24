@@ -94,6 +94,18 @@ const isApiNotReachableError = (message: string) => {
   );
 };
 
+const shouldPreferSupabaseRegistration = () => {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  const host = window.location.hostname;
+
+  // En despliegues serverless donde el backend API no está disponible,
+  // evitar el intento inicial contra /api/auth/register para no generar 404 ruidosos.
+  return host.endsWith('vercel.app');
+};
+
 async function registerUserViaSupabase(data: {
   nombre: string;
   email: string;
@@ -241,6 +253,10 @@ export const auth = {
     org_unit_id?: number | string | null;
     activo?: boolean;
   }) => {
+    if (shouldPreferSupabaseRegistration()) {
+      return registerUserViaSupabase(data);
+    }
+    
     try {
       return await fetchAPI('/auth/register', {
         method: 'POST',
