@@ -62,6 +62,10 @@ const getApiBaseUrl = () => {
 };
 
 const API_URL = getApiBaseUrl();
+const FALLBACK_API_URL =
+  API_URL.endsWith('/api') && typeof window !== 'undefined'
+    ? window.location.origin.replace(/\/$/, '')
+    : null;
 
 // Helper para hacer requests autenticados
 async function fetchAPI(endpoint: string, options: RequestInit = {}) {
@@ -74,11 +78,19 @@ async function fetchAPI(endpoint: string, options: RequestInit = {}) {
     ...options.headers,
   };
 
-  const response = await fetch(url, {
+  let response = await fetch(url, {
     ...options,
     headers,
   });
 
+  if (response.status === 404 && FALLBACK_API_URL) {
+    const fallbackUrl = `${FALLBACK_API_URL}${endpoint}`;
+    response = await fetch(fallbackUrl, {
+      ...options,
+      headers,
+    });
+  }
+  
   const text = await response.text();
   const contentType = response.headers.get('content-type') || '';
   const normalizedBody = text.trim();
