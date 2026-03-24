@@ -169,6 +169,69 @@ async function registerUserViaSupabase(data: {
   return signUpData;
 }
 
+async function loginViaSupabase(email: string, password: string) {
+  if (typeof window === 'undefined') {
+    throw new Error('No se puede iniciar sesión en este entorno.');
+  }
+
+  const { getSupabaseClient } = await import('./supabase');
+  const supabase = getSupabaseClient();
+  const normalizedEmail = email.trim().toLowerCase();
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: normalizedEmail,
+    password,
+  });
+
+  if (error) {
+    throw new Error(error.message || 'No se pudo iniciar sesión con Supabase.');
+  }
+
+  const accessToken = data.session?.access_token;
+  if (!accessToken) {
+    throw new Error('Supabase no devolvió un access_token válido.');
+  }
+
+  return {
+    access_token: accessToken,
+    token_type: 'bearer',
+  };
+}
+
+async function getProfileViaSupabase() {
+  if (typeof window === 'undefined') {
+    throw new Error('No se pudo obtener el perfil en este entorno.');
+  }
+
+  const { getSupabaseClient } = await import('./supabase');
+  const supabase = getSupabaseClient();
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    throw new Error(userError?.message || 'No se pudo obtener el usuario autenticado.');
+  }
+
+  const { data: profile, error: profileError } = await supabase
+    .from('users')
+    .select('id, nombre, email, rol, org_unit_id, activo')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  if (profileError) {
+    throw new Error(profileError.message || 'No se pudo obtener el perfil del usuario.');
+  }
+
+  if (!profile) {
+    throw new Error(
+      'El usuario está autenticado, pero no tiene perfil en public.users. Contacta a TI.',
+    );
+  }
+
+  return profile;
+}
+
 // Helper para hacer requests autenticados
 async function fetchAPI(endpoint: string, options: RequestInit = {}) {
   const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
@@ -242,10 +305,19 @@ async function fetchAPI(endpoint: string, options: RequestInit = {}) {
 // Auth
 export const auth = {
   login: async (email: string, password: string) => {
-    return fetchAPI('/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ email, password }),
-    });
+    try {
+      return await fetchAPI('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email, password }),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!isApiNotReachableError(message)) {
+        throw error;
+      }
+
+      return loginViaSupabase(email, password);
+    }
   },
 
   register: async (data: {
@@ -276,7 +348,16 @@ export const auth = {
   },
   
   getProfile: async () => {
-    return fetchAPI('/auth/profile');
+    try {
+      return await fetchAPI('/auth/profile');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!isApiNotReachableError(message)) {
+        throw error;
+      }
+
+      return getProfileViaSupabase();
+    }
   },
 };
 
