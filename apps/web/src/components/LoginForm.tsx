@@ -5,6 +5,9 @@ import { auth } from '../lib/api';
 import { tryGetSupabaseClient } from '../lib/supabase';
 
 const LoginForm: React.FC = () => {
+  const demoEmail = import.meta.env.PUBLIC_DEMO_EMAIL;
+  const demoPassword = import.meta.env.PUBLIC_DEMO_PASSWORD;
+  const hasDemoUser = Boolean(demoEmail && demoPassword);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -118,7 +121,14 @@ const LoginForm: React.FC = () => {
         setIsActive(true);
       }
     } catch (err: any) {
-      setError(err.message || (isLogin ? 'Error al iniciar sesión' : 'Error al crear la cuenta'));
+      const fallbackMessage = isLogin ? 'Error al iniciar sesión' : 'Error al crear la cuenta';
+      const rawErrorMessage = err?.message || fallbackMessage;
+
+      if (isLogin && rawErrorMessage.toLowerCase().includes('invalid login credentials')) {
+        setError('Credenciales inválidas. Verifica correo/contraseña o usa "Registrarme" para crear tu cuenta.');
+      } else {
+        setError(rawErrorMessage);
+      }
     } finally {
       setLoading(false);
     }
@@ -349,11 +359,22 @@ const LoginForm: React.FC = () => {
           </button>
         </form>
 
-        {isLogin && (
+        {isLogin && hasDemoUser && (
           <div className="mt-6 p-4 bg-blue-50 rounded-lg">
             <p className="text-xs font-medium text-blue-900 mb-2">Usuario de Prueba:</p>
-            <p className="text-xs text-blue-700">Email: admin@gemelli.edu.co</p>
-            <p className="text-xs text-blue-700">Password: Admin123!</p>
+            <p className="text-xs text-blue-700">Email: {demoEmail}</p>
+            <p className="text-xs text-blue-700">Password: {demoPassword}</p>
+            <button
+              type="button"
+              onClick={() => {
+                setEmail(demoEmail!);
+                setPassword(demoPassword!);
+                setError('');
+              }}
+              className="mt-3 text-xs font-medium text-blue-700 underline hover:text-blue-900"
+            >
+              Usar usuario de prueba
+            </button>
           </div>
         )}
       </div>
