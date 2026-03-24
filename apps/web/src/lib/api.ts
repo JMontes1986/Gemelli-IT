@@ -121,11 +121,14 @@ async function registerUserViaSupabase(data: {
   const { getSupabaseClient } = await import('./supabase');
   const supabase = getSupabaseClient();
   const normalizedEmail = data.email.trim().toLowerCase();
-
+  const emailRedirectTo =
+    typeof window !== 'undefined' ? `${window.location.origin.replace(/\/$/, '')}/login` : undefined;
+  
   const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
     email: normalizedEmail,
     password: data.password,
     options: {
+      ...(emailRedirectTo ? { emailRedirectTo } : {}),
       data: {
         nombre: data.nombre,
         rol: data.rol,
