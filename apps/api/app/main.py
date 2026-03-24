@@ -758,6 +758,31 @@ def fetch_user_record_by_email(email: str) -> Dict[str, Any]:
     return record
 
 
+def authenticate_with_supabase_password(email: str, password: str) -> tuple[bool, Optional[str]]:
+    """Valida credenciales contra Supabase Auth para cuentas administradas allí."""
+    try:
+        result = supabase.auth.sign_in_with_password({"email": email, "password": password})
+    except Exception as exc:
+        message = extract_supabase_error_message(exc, "Credenciales inválidas")
+        logger.warning("No se pudo validar usuario con Supabase Auth: %s", message)
+        return False, message
+
+    error = getattr(result, "error", None)
+    if error:
+        message = extract_supabase_error_message(error, "Credenciales inválidas")
+        return False, message
+
+    user = getattr(result, "user", None)
+    if user:
+        return True, None
+
+    data = getattr(result, "data", None)
+    if isinstance(data, dict) and data.get("user"):
+        return True, None
+
+    return False, "Credenciales inválidas"
+
+
 def get_inventory_permission_by_email(email: Optional[str]) -> Optional[dict]:
     normalized = normalize_email_value(email)
     if not normalized:
@@ -890,12 +915,34 @@ async def login(payload: LoginRequest):
 
     record = fetch_user_record_by_email(normalized_email)
 
-    if not verify_password(payload.password, record["password_hash"]):
-        raise HTTPException(status_code=401, detail="Credenciales inválidas")
-
     if record.get("activo") is False:
         raise HTTPException(status_code=403, detail="Usuario inactivo")
 
+    password_hash = record.get("password_hash") or ""
+    password_valid = False
+
+    if password_hash and password_hash != "managed_by_supabase_auth":
+        try:
+            password_valid = verify_password(payload.password, password_hash)
+        except Exception as exc:
+            logger.warning("No se pudo validar password_hash local para %s: %s", normalized_email, exc)
+
+    if not password_valid:
+        supabase_valid, supabase_error = authenticate_with_supabase_password(
+            normalized_email, payload.password
+        )
+        if not supabase_valid:
+            raise HTTPException(status_code=401, detail=supabase_error or "Credenciales inválidas")
+
+        # Mantener compatibilidad con el flujo actual: al validar por Supabase,
+        # sincronizamos un hash local para futuros inicios de sesión.
+        try:
+            supabase.table("users").update(
+                {"password_hash": get_password_hash(payload.password)}
+            ).eq("id", record["id"]).execute()
+        except Exception as exc:
+            logger.warning("No se pudo sincronizar password_hash local para %s: %s", normalized_email, exc)
+            
     user_profile = build_user_profile_from_record(record)
     token = create_access_token(user_profile.id)
     return LoginResponse(access_token=token, user=user_profile)
