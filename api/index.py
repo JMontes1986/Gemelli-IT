@@ -1,10 +1,15 @@
-# api/index.py
-# Este archivo es el punto de entrada para Vercel serverless.
-# Debe estar en la RAÍZ del proyecto (no dentro de apps/api).
-import sys
+"""Vercel Serverless Function entry point for the FastAPI application."""
+
+from __future__ import annotations
+
 import os
+import sys
 
-# Agrega apps/api al path para que Python encuentre el módulo app
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'apps', 'api'))
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+API_ROOT = os.path.join(PROJECT_ROOT, "apps", "api")
+if API_ROOT not in sys.path:
+    sys.path.insert(0, API_ROOT)
+  
+from app.main import app  # noqa: E402
 
-from app.main import handler
+__all__ = ["app"]
