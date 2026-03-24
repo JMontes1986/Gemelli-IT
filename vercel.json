@@ -9,7 +9,7 @@
       "maxDuration": 30,
       "memory": 1024
     },
-    "api/**": {
+    "apps/api/**": {
       "runtime": "python3.11",
       "maxDuration": 30,
       "memory": 1024
