@@ -51,7 +51,6 @@ loguru==0.7.2
 
 # File handling
 python-magic==0.4.27
-Pillow==10.2.0
 
 # JSON
 
