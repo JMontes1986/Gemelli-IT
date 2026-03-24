@@ -67,6 +67,23 @@ const FALLBACK_API_URL =
     ? window.location.origin.replace(/\/$/, '')
     : null;
 
+const buildFallbackUrls = (endpoint: string) => {
+  if (typeof window === 'undefined') {
+    return [] as string[];
+  }
+
+  const origin = window.location.origin.replace(/\/$/, '');
+  const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  const urls: string[] = [];
+
+  if (FALLBACK_API_URL) {
+    urls.push(`${FALLBACK_API_URL}${normalizedEndpoint}`);
+    urls.push(`${origin}/api/index${normalizedEndpoint}`);
+  }
+
+  return Array.from(new Set(urls));
+};
+
 // Helper para hacer requests autenticados
 async function fetchAPI(endpoint: string, options: RequestInit = {}) {
   const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
@@ -83,12 +100,19 @@ async function fetchAPI(endpoint: string, options: RequestInit = {}) {
     headers,
   });
 
-  if (response.status === 404 && FALLBACK_API_URL) {
-    const fallbackUrl = `${FALLBACK_API_URL}${endpoint}`;
-    response = await fetch(fallbackUrl, {
-      ...options,
-      headers,
-    });
+  if (response.status === 404) {
+    const fallbackUrls = buildFallbackUrls(endpoint);
+
+    for (const fallbackUrl of fallbackUrls) {
+      response = await fetch(fallbackUrl, {
+        ...options,
+        headers,
+      });
+
+      if (response.status !== 404) {
+        break;
+      }
+    }
   }
   
   const text = await response.text();
