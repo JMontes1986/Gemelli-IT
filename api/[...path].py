@@ -1,4 +1,4 @@
-"""Vercel Serverless Function catch-all for the FastAPI application."""
+"""Vercel Serverless Function — catch-all route para el backend FastAPI."""
 
 from __future__ import annotations
 
@@ -10,6 +10,6 @@ API_ROOT = os.path.join(PROJECT_ROOT, "apps", "api")
 if API_ROOT not in sys.path:
     sys.path.insert(0, API_ROOT)
 
-from app.main import app  # noqa: E402
+from app.main import handler  # noqa: E402 — Mangum handler requerido por Vercel
 
-__all__ = ["app"]
+__all__ = ["handler"]
